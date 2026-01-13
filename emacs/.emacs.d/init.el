@@ -908,7 +908,9 @@ this is effective with some expand functions, eg.,
 
 (use-package vertico
   :ensure t
-  :hook (after-init . vertico-mode)
+  ;; :hook (after-init . vertico-mode)
+  :init
+  (vertico-mode)
   :custom
   (vertico-multiform-commands
    '((consult-yank-pop indexed)
@@ -967,7 +969,11 @@ this is effective with some expand functions, eg.,
   :after vertico
   :bind (:map minibuffer-local-map
               ("M-A" . marginalia-cycle))
-  :config
+
+  :init
+  ;; Marginalia must be activated in the :init section of use-package such that
+  ;; the mode gets enabled right away. Note that this forces loading the
+  ;; package.
   (marginalia-mode))
 
 
