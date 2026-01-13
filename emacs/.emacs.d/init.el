@@ -922,7 +922,7 @@ this is effective with some expand functions, eg.,
 (use-package consult
   :ensure t
   :after vertico
-
+  ;; Replace bindings. Lazily loaded by `use-package'.
   :bind (;; C-c bindings in `mode-specific-map'
          ("C-c M-x" . consult-mode-command)
          ("C-c TAB" . consult-imenu)
@@ -936,42 +936,30 @@ this is effective with some expand functions, eg.,
          ("C-x p b" . consult-project-buffer)
          ("C-x p g" . consult-ripgrep)
 
-         ;; Other override bindings
-         ("C-M-s"   . consult-line)
+         ;; Other custom bindings
          ("M-y"     . consult-yank-replace)
-         ("M-g M-g" . consult-goto-line))
+         ("C-M-s"   . consult-line)
+         
+         ;; M-g bindings in `goto-map'
+         ("M-g M-g" . consult-goto-line)
+         ("M-g i"   . consult-imenu)
 
-  :bind (:map isearch-mode-map
-              ("M-o" . consult-line))
+         ;; Isearch integration
+         :map isearch-mode-map
+         ("M-o" . consult-line))
 
   :init
   ;; Use Consult to select xref locations with preview
   (setq xref-show-xrefs-function #'consult-xref
         xref-show-definitions-function #'consult-xref)
 
-  ;; Use `consult-completion-in-region' if Vertico is enabled.
-  ;; Otherwise use the default `completion--in-region' function.
-  (setq completion-in-region-function
-        (lambda (&rest args)
-          (apply (if vertico-mode
-                     #'consult-completion-in-region
-                   #'completion--in-region)
-                 args)))
+  ;; Trigger preview manually
+  (setq consult-preview-key "M-.")
 
   :config
   ;; Explicitly require `recentf' in order to use `consult-recent-file'.
   (require 'recentf)
-  (consult-customize consult-ripgrep
-                     consult-git-grep
-                     consult-grep
-                     consult-bookmark
-                     consult-recent-file
-                     consult-xref
-                     consult--source-bookmark
-                     consult--source-file-register
-                     consult--source-recent-file
-                     consult--source-project-recent-file
-                     :preview-key "M-."))
+  (setq completion-in-region-function #'consult-completion-in-region))
 
 
 (use-package marginalia
@@ -1666,6 +1654,15 @@ no region is activated, this will operate on the entire buffer."
 (use-package go-rename
   :ensure t
   :after go-mode)
+
+
+(use-package rust-mode
+  :ensure t
+  :defer t
+  :bind
+  (:map rust-mode-map ("<f12>" . rust-format-buffer))
+  :custom
+  (rust-format-on-save t))
 
 
 (use-package vimrc-mode
