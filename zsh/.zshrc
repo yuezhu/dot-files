@@ -267,7 +267,7 @@ zstyle ':vcs_info:git:*' actionformats ' %F{cyan}%b|%a%f'
 
 # https://github.com/ohmyzsh/ohmyzsh/tree/master/themes
 # https://zsh.sourceforge.io/Doc/Release/Prompt-Expansion.html
-PROMPT='%B%F{green}%m%f %F{blue}%~%f${vcs_info_msg_0_} %#%b '
+PROMPT='%B%F{green}%m%f %F{blue}%~%f${vcs_info_msg_0_} %(!.#.$)%b '
 #RPROMPT=' %B%D{%H:%M:%S.%.}%b'
 
 ## MISC
