@@ -73,8 +73,8 @@
   :defer t
   :custom
   ;; src/nsterm.m
-  (ns-alternate-modifier 'super)
-  (ns-command-modifier 'meta)
+  ;; (ns-alternate-modifier 'super)
+  ;; (ns-command-modifier 'meta)
 
   ;; src/frame.c
   (menu-bar-mode (equal system-type 'darwin))
