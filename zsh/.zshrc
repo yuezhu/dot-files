@@ -262,14 +262,14 @@ add-zsh-hook precmd vcs_info
 
 # Minimal VCS information in prompt
 # https://zsh.sourceforge.io/Doc/Release/User-Contributions.html#Version-Control-Information
-# zstyle ':vcs_info:git:*' formats ' %F{cyan}%b%f'
-# zstyle ':vcs_info:git:*' actionformats ' %F{cyan}%b|%a%f'
+zstyle ':vcs_info:git:*' formats ' %F{cyan}%b%f'
+zstyle ':vcs_info:git:*' actionformats ' %F{cyan}%b|%a%f'
 
-zstyle ':vcs_info:git:*' check-for-changes true
-zstyle ':vcs_info:git:*' stagedstr '+'
-zstyle ':vcs_info:git:*' unstagedstr '*'
-zstyle ':vcs_info:git:*' formats ' %F{cyan}%b%u%c%f'
-zstyle ':vcs_info:git:*' actionformats ' %F{cyan}%b|%a%u%c%f'
+# zstyle ':vcs_info:git:*' check-for-changes true
+# zstyle ':vcs_info:git:*' stagedstr '+'
+# zstyle ':vcs_info:git:*' unstagedstr '*'
+# zstyle ':vcs_info:git:*' formats ' %F{cyan}%b%u%c%f'
+# zstyle ':vcs_info:git:*' actionformats ' %F{cyan}%b|%a%u%c%f'
 
 # https://github.com/ohmyzsh/ohmyzsh/tree/master/themes
 # https://zsh.sourceforge.io/Doc/Release/Prompt-Expansion.html
