@@ -844,14 +844,14 @@ this is effective with some expand functions, eg.,
   :custom
   (eglot-autoshutdown t)
   (eglot-events-buffer-size 0)
-  (eglot-ignored-server-capabilites
-   '(:documentHighlightProvider
-     :codeActionProvider
-     :codeLensProvider
-     :documentFormattingProvider
-     :documentRangeFormattingProvider
-     :documentOnTypeFormattingProvider
-     :documentLinkProvider))
+  ;; (eglot-ignored-server-capabilites
+  ;;  '(:documentHighlightProvider
+  ;;    :codeActionProvider
+  ;;    :codeLensProvider
+  ;;    :documentFormattingProvider
+  ;;    :documentRangeFormattingProvider
+  ;;    :documentOnTypeFormattingProvider
+  ;;    :documentLinkProvider))
 
   ;; :config
   ;; (add-to-list 'eglot-stay-out-of 'flymake)
