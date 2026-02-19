@@ -108,7 +108,6 @@
    '(read-only t cursor-intangible t face minibuffer-prompt))
 
   ;; src/buffer.c
-  (fill-column 78)
   (tab-width 4)
 
   ;; src/frame.c
@@ -413,15 +412,8 @@
 
 (use-package exec-path-from-shell
   :if (memq window-system '(mac ns))
-  :disabled ;; 06/28/19 disabled since it significantly slows down Emacs startup
   :ensure t
-  :demand t
   :config
-  (dolist (var '("LANG"
-                 "LC_CTYPE"
-                 "JAVA_HOME"
-                 "GOROOT"))
-    (add-to-list #'exec-path-from-shell-variables var))
   (exec-path-from-shell-initialize))
 
 
@@ -887,10 +879,10 @@ this is effective with some expand functions, eg.,
   (imenu-auto-rescan-maxout 600000)
   (imenu-max-item-length "Unlimited")
   :hook
-  ((org-mode
-    markdown-mode
-    prog-mode
+  ((prog-mode
     conf-mode
+    outline-mode
+    markdown-mode
     package-menu-mode)
    . imenu-add-menubar-index))
 
@@ -1060,7 +1052,9 @@ this is effective with some expand functions, eg.,
               ("C-<tab>" . copilot-accept-completion-by-word)
               ("C-TAB" . copilot-accept-completion-by-word)
               ("C-n" . copilot-next-completion)
-              ("C-p" . copilot-previous-completion)))
+              ("C-p" . copilot-previous-completion))
+  :hook
+  ((text-mode prog-mode conf-mode) . copilot-mode))
 
 
 (use-package ace-window
@@ -1195,17 +1189,14 @@ this is effective with some expand functions, eg.,
 (use-package org
   :ensure t
   :defer t
-  :pin gnu
   :bind (("C-c a" . org-agenda)
          ("C-c c" . org-capture)
          ("C-c l" . org-store-link))
 
-  :diminish org-indent-mode
-
   :hook
   (org-mode
    . (lambda ()
-       (setq-local fill-column 120)
+       ;; (setq-local fill-column 120)
        ;; (setq-local electric-pair-pairs
        ;;             (append electric-pair-pairs '((?* . ?*)
        ;;                                           (?/ . ?/)
@@ -1251,7 +1242,13 @@ this is effective with some expand functions, eg.,
       :base-directory "~/org/"
       :base-extension "org"
       :publishing-function org-html-publish-to-html
-      :publishing-directory "~/.www"
+      :publishing-directory "~/.www/org"
+      :recursive t)
+     ("org-roam"
+      :base-directory "~/org-roam/"
+      :base-extension "org"
+      :publishing-function org-html-publish-to-html
+      :publishing-directory "~/.www/org-roam"
       :recursive t)))
 
   :config
@@ -1262,6 +1259,13 @@ this is effective with some expand functions, eg.,
                '("\\`\\*Org Select\\*\\|\\*Agenda Commands\\*\\'"
                  (display-buffer-at-bottom)
                  (inhibit-same-window . t))))
+
+
+(use-package org-indent
+  ;; It is part of `org'
+  :defer t
+  :after org
+  :diminish org-indent-mode)
 
 
 (use-package org-make-toc
@@ -1781,7 +1785,7 @@ no region is activated, this will operate on the entire buffer."
 (use-package color-theme-sanityinc-tomorrow
   :ensure t
   :config
-  (load-theme 'sanityinc-tomorrow-bright t)
+  (load-theme 'sanityinc-tomorrow-night t)
   ;; (set-face-attribute 'font-lock-comment-delimiter-face nil :slant 'normal)
   ;; (set-face-attribute 'font-lock-comment-face nil :slant 'normal)
   ;; (unless (display-graphic-p)
