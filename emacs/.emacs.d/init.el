@@ -1200,6 +1200,8 @@ this is effective with some expand functions, eg.,
          ("C-c c" . org-capture)
          ("C-c l" . org-store-link))
 
+  :diminish org-indent-mode
+
   :hook
   (org-mode
    . (lambda ()
