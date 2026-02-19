@@ -73,8 +73,8 @@
   :defer t
   :custom
   ;; src/nsterm.m
-  ;; (ns-alternate-modifier 'super)
-  ;; (ns-command-modifier 'meta)
+  (ns-alternate-modifier 'super)
+  (ns-command-modifier 'meta)
 
   ;; src/frame.c
   (menu-bar-mode (equal system-type 'darwin))
@@ -137,6 +137,7 @@
   ;; files.el
   (confirm-kill-emacs 'yes-or-no-p)
   (directory-free-space-args "-Pkh")
+  (find-file-visit-truename t)
   (make-backup-files nil)
   (mode-require-final-newline t)
   (require-final-newline t)
@@ -884,7 +885,14 @@ this is effective with some expand functions, eg.,
   :custom
   (imenu-auto-rescan t)
   (imenu-auto-rescan-maxout 600000)
-  (imenu-max-item-length "Unlimited"))
+  (imenu-max-item-length "Unlimited")
+  :hook
+  ((org-mode
+    markdown-mode
+    prog-mode
+    conf-mode
+    package-menu-mode)
+   . imenu-add-menubar-index))
 
 
 (use-package crux
@@ -941,7 +949,7 @@ this is effective with some expand functions, eg.,
          ;; Other custom bindings
          ("M-y"     . consult-yank-replace)
          ("C-M-s"   . consult-line)
-         
+
          ;; M-g bindings in `goto-map'
          ("M-g M-g" . consult-goto-line)
          ("M-g i"   . consult-imenu)
@@ -1015,13 +1023,12 @@ this is effective with some expand functions, eg.,
 (use-package corfu
   :ensure t
   :custom
-  (corfu-auto-prefix 2)
-  (corfu-auto-delay 0.2)
-  (corfu-cycle t)                ;; Enable cycling for `corfu-next/previous'
-  (corfu-auto t)                 ;; Enable auto completion
-  (corfu-separator ?\s)          ;; Orderless field separator
-  (corfu-quit-no-match 'separator)
-  (corfu-preview-current nil)    ;; Disable current candidate preview
+  ;; No auto completion
+  ;; (corfu-auto t)
+  ;; (corfu-auto-prefix 2)
+  ;; (corfu-auto-delay 0.2)
+  (corfu-cycle t)  ;; Enable cycling for `corfu-next/previous'
+  (corfu-preview-current t)
   (corfu-min-width 60)
   ;; (corfu-popupinfo-delay nil)
 
@@ -1042,6 +1049,18 @@ this is effective with some expand functions, eg.,
   (add-to-list 'completion-at-point-functions #'cape-keyword t)
   (add-to-list 'completion-at-point-functions #'cape-dabbrev t)
   (add-to-list 'completion-at-point-functions #'cape-file t))
+
+
+(use-package copilot
+  :ensure t
+  :defer t
+  :bind (:map copilot-completion-map
+              ("<tab>" . copilot-accept-completion)
+              ("TAB" . copilot-accept-completion)
+              ("C-<tab>" . copilot-accept-completion-by-word)
+              ("C-TAB" . copilot-accept-completion-by-word)
+              ("C-n" . copilot-next-completion)
+              ("C-p" . copilot-previous-completion)))
 
 
 (use-package ace-window
@@ -1200,9 +1219,9 @@ this is effective with some expand functions, eg.,
   (org-blank-before-new-entry '((heading)
                                 (plain-list-item)))
   (org-clone-delete-id t)
-  (org-default-notes-file (concat
-                           (file-name-as-directory org-directory)
-                           "notes.org"))
+  ;; (org-default-notes-file (concat
+  ;;                          (file-name-as-directory org-directory)
+  ;;                          "notes.org"))
   (org-edit-src-content-indentation 0)
   (org-export-default-language "en")
   (org-export-with-creator t)
@@ -1220,32 +1239,9 @@ this is effective with some expand functions, eg.,
   (org-yank-adjusted-subtrees t)
 
   (org-capture-templates
-   '(("t" "Task" entry
-      (file+headline "tasks.org" "Inbox")
-      "* TODO %?
-:PROPERTIES:
-:CREATED: %U
-:END:"
-      :prepend t)
-     ("j" "Journal" entry
-      (file+olp+datetree "tasks.org" "Journal")
-      "* %?
-:PROPERTIES:
-:CREATED: %U
-:END:")
-     ("s" "Snippet" entry
-      (file+headline "" "Snippet")
-      "* %?
-:PROPERTIES:
-:CREATED: %U
-:END:"
-      :jump-to-captured t)
-     ("m" "Miscellaneous" entry
-      (file+headline "" "Miscellaneous")
-      "* %?
-:PROPERTIES:
-:CREATED: %U
-:END:"
+   '(("j" "Journal" entry
+      (file+olp+datetree "journal.org")
+      "* %?\n%i"
       :jump-to-captured t)))
 
   (org-publish-project-alist
@@ -1807,18 +1803,6 @@ no region is activated, this will operate on the entire buffer."
                    "-*-Menlo-regular-normal-normal-*-14-*-*-*-*-0-iso10646-1")))
                 (set-frame-parameter nil 'fullscreen 'maximized))
             t))
-
-
-;;
-;; Configure system trash
-;;
-(when (equal system-type 'darwin)
-  (if (executable-find "trash")
-      (defun system-move-file-to-trash (file)
-        "Use \"trash\" to move FILE to the MacOS Trash."
-        (call-process "trash" nil 0 nil
-                      file))
-    (setq trash-directory "~/.Trash")))
 
 
 ;;
