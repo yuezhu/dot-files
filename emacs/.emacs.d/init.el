@@ -1,9 +1,20 @@
-;; -*- lexical-binding: t; -*-
+;;; init.el --- ... -*- lexical-binding: t -*-
 
 ;; Used to report time spent loading this module
 (defconst emacs-start-time (current-time))
 
-;; Clear `file-name-handler-alist' during startup (affecting startup time).
+;; `file-name-handler-alist' maps filename patterns (regexes) to
+;; special handler functions. When Emacs opens or operates on a file
+;; whose name matches a pattern, it routes the operation through that
+;; During startup, Emacs calls `load', `require', and various file
+;; operations hundreds of times to load packages and config files. For
+;; every file operation, Emacs iterates through
+;; `file-name-handler-alist' and runs each regex against the filename
+;; to check for a match.  These regexes almost never match during
+;; startup (you're loading local .el files, not remote TRAMP paths or
+;; .gz archives), so it's pure overhead. As a result, we temperatily
+;; clear `file-name-handler-alist' during startup and restore it at
+;; the end.
 (defvar file-name-handler-alist-old file-name-handler-alist)
 
 (setq file-name-handler-alist nil)
@@ -12,10 +23,40 @@
           #'(lambda ()
               (setq file-name-handler-alist file-name-handler-alist-old)))
 
-;; Garbage collect at the end of startup
-(add-hook 'after-init-hook #'garbage-collect t)
-
+;; Add local lisp files directory to `load-path'.
 (add-to-list 'load-path (expand-file-name "lisp" user-emacs-directory))
+
+
+;; Debugging utilities for package loading.  Useful for tracking down
+;; which package is loading a particular feature.
+(defun debug-package-load (feature)
+  "Trace where FEATURE is loaded from.
+
+Add advice to both `require' and `load' to print a backtrace
+when FEATURE is loaded.  Call this early in init.el, before
+the package in question could be loaded.
+
+FEATURE is a symbol, e.g. \\='reformatter.
+
+Usage:
+  (debug-package-load \\='reformatter)"
+  (let ((name (symbol-name feature)))
+    (advice-add 'require :before
+                `(lambda (feat &rest _)
+                   (when (eq feat ',feature)
+                     (message "*** %s required ***" ,name)
+                     (backtrace)))
+                `((name . ,(intern (format "debug-%s-require" name)))))
+    (advice-add 'load :before
+                `(lambda (file &rest _)
+                   (when (and (stringp file)
+                              (string-match-p ,name file))
+                     (message "*** %s loaded via load ***" ,name)
+                     (backtrace)))
+                `((name . ,(intern (format "debug-%s-load" name)))))))
+
+
+;; (debug-package-load 'reformatter)
 
 
 ;;
@@ -23,12 +64,11 @@
 ;;
 (require 'package)
 
+;; Some packages are built into Emacs, but I want to use the ELPA
+;; versions.
 (defconst package-must-use-elpa-packages
   '(org eldoc flymake eglot)
   "A list of packages that must use the ELPA versions.")
-
-(add-to-list 'package-archives
-             '("melpa" . "https://melpa.org/packages/") t)
 
 (advice-add 'package-installed-p :around
             (lambda (func &rest args)
@@ -37,18 +77,21 @@
                     (assq pkg package-alist)
                   (apply func args)))))
 
+(add-to-list 'package-archives
+             '("melpa" . "https://melpa.org/packages/") t)
+
 (package-initialize)
 
 (unless package-archive-contents
   (package-refresh-contents))
 
 (advice-add 'package-upgrade-all :around
-            (lambda (func &rest args)
+            (lambda (func &rest _)
               "Upgrade all packages without asking."
               (funcall func)))
 
 ;;
-;; Initialize use-package
+;; Initialize `use-package'
 ;; https://github.com/jwiegley/use-package
 ;;
 (setq use-package-enable-imenu-support t
@@ -142,8 +185,8 @@
   (require-final-newline t)
 
   ;; mouse.el
-  ;; Enable context menu. `vertico-multiform-mode' adds a menu in the minibuffer
-  ;; to switch display modes.
+  ;; Enable context menu. `vertico-multiform-mode' adds a menu in the
+  ;; minibuffer to switch display modes.
   (context-menu-mode t)
 
   ;; startup.el
@@ -153,11 +196,17 @@
   (large-file-warning-threshold 50000000)
 
   ;; indent.el
+  ;; TAB first tries to indent the current line, and if the line was
+  ;; already indented, then try to complete the thing at point.
   (tab-always-indent 'complete)
+
+  ;; minibuffer.el
+  (completion-cycle-threshold nil)
 
   :custom-face
   (aw-leading-char-face
    ((t (:inherit aw-leading-char-face :weight bold :height 3.0))))
+
   :init
   (add-hook 'after-save-hook
             #'executable-make-buffer-file-executable-if-script-p))
@@ -366,7 +415,6 @@
 
 (use-package eldoc
   :ensure t
-  ;; Loaded by something else; defer 2 doesn't work.
   :defer 2
   :diminish
   :hook
@@ -1015,14 +1063,31 @@ this is effective with some expand functions, eg.,
 (use-package corfu
   :ensure t
   :custom
-  ;; No auto completion
-  ;; (corfu-auto t)
-  ;; (corfu-auto-prefix 2)
-  ;; (corfu-auto-delay 0.2)
-  (corfu-cycle t)  ;; Enable cycling for `corfu-next/previous'
-  (corfu-preview-current t)
-  (corfu-min-width 60)
-  ;; (corfu-popupinfo-delay nil)
+
+  ;; Only use `corfu' when calling `completion-at-point' or
+  ;; `indent-for-tab-command'
+  (corfu-auto nil)
+  (corfu-auto-prefix 2)
+  (corfu-auto-delay 0.25)
+
+  (corfu-min-width 80)
+  (corfu-max-width corfu-min-width)     ; Always have the same width
+  (corfu-count 14)
+  (corfu-scroll-margin 4)
+  (corfu-cycle nil)
+
+  ;; `nil' means to ignore `corfu-separator' behavior, that is, use the older
+  ;; `corfu-quit-at-boundary' = nil behavior. Set this to separator if using
+  ;; `corfu-auto' = `t' workflow (in that case, make sure you also set up
+  ;; `corfu-separator' and a keybind for `corfu-insert-separator', which my
+  ;; configuration already has pre-prepared). Necessary for manual corfu usage with
+  ;; orderless, otherwise first component is ignored, unless `corfu-separator'
+  ;; is inserted.
+  (corfu-quit-at-boundary nil)
+  (corfu-separator ?\s)            ; Use space
+  (corfu-quit-no-match 'separator) ; Don't quit if there is `corfu-separator' inserted
+  (corfu-preview-current 'insert)  ; Preview first candidate. Insert on input if only one
+  (corfu-preselect-first t)        ; Preselect first candidate?
 
   :bind (:map corfu-map
               ("<escape>" . corfu-quit)
@@ -1030,8 +1095,21 @@ this is effective with some expand functions, eg.,
               ("M-d"      . corfu-popupinfo-toggle))
 
   :hook
-  (after-init . global-corfu-mode)
-  (global-corfu-mode . corfu-popupinfo-mode))
+  (after-init . global-corfu-mode))
+
+
+(use-package corfu-popupinfo
+  :after corfu
+  :hook (corfu-mode . corfu-popupinfo-mode)
+  :bind (:map corfu-map
+              ("M-n" . corfu-popupinfo-scroll-up)
+              ("M-p" . corfu-popupinfo-scroll-down)
+              ([remap corfu-show-documentation] . corfu-popupinfo-toggle))
+
+  :custom
+  (corfu-popupinfo-delay 0.5)
+  (corfu-popupinfo-max-width 70)
+  (corfu-popupinfo-max-height 20))
 
 
 (use-package cape
@@ -1047,12 +1125,14 @@ this is effective with some expand functions, eg.,
   :ensure t
   :defer t
   :bind (:map copilot-completion-map
-              ("<tab>" . copilot-accept-completion)
-              ("TAB" . copilot-accept-completion)
+              ;; I use TAB to trigger `corfu' completion.
+              ;; ("<tab>" . copilot-accept-completion)
+              ;; ("TAB" . copilot-accept-completion)
+              ("C-e" . copilot-accept-completion)
               ("C-<tab>" . copilot-accept-completion-by-word)
               ("C-TAB" . copilot-accept-completion-by-word)
-              ("C-n" . copilot-next-completion)
-              ("C-p" . copilot-previous-completion))
+              ("M-n" . copilot-next-completion)
+              ("M-p" . copilot-previous-completion))
   :hook
   ((text-mode prog-mode conf-mode) . copilot-mode))
 
@@ -1322,13 +1402,18 @@ this is effective with some expand functions, eg.,
 
 (use-package markdown-toc
   :ensure t
+  :after markdown-mode
   :defer t
   :diminish
   :hook
   (markdown-mode
    . (lambda ()
-       (add-hook 'before-save-hook #'markdown-toc-refresh-toc t t)))
-  :defer t)
+       "Refresh the table of contents before saving the file.
+
+This only affects the current markdown buffer, and does not add the
+`before-save-hook' globally.
+"
+       (add-hook 'before-save-hook #'markdown-toc-refresh-toc t t))))
 
 
 (use-package edit-indirect
@@ -1416,6 +1501,7 @@ this is effective with some expand functions, eg.,
 (use-package reformatter
   :ensure t
   :defer t
+  :functions reformatter-define
   :config
   (add-to-list 'display-buffer-alist
                '("\\`\\*.*-format errors\\*\\'"
@@ -1429,8 +1515,6 @@ this is effective with some expand functions, eg.,
                                                        2)
                                                       10))))
 
-  ;; Using `reformatter-define' will cause `:config' to run even though it
-  ;; should be deferred due to the presence of `:hook'.
   (reformatter-define clang-format
     :program "clang-format"
     :args (list "--assume-filename" (buffer-file-name)))
@@ -1473,7 +1557,12 @@ this is effective with some expand functions, eg.,
 
 (use-package google-c-style
   :ensure t
-  :defer t)
+  :defer t
+  :hook
+  (c-mode-common
+   . (lambda ()
+       (google-set-c-style)
+       (google-make-newline-indent))))
 
 
 (use-package prog-mode
@@ -1528,7 +1617,17 @@ no region is activated, this will operate on the entire buffer."
   :hook
   (emacs-lisp-mode
    . (lambda ()
-       (add-hook 'after-save-hook #'check-parens nil t))))
+       (add-hook 'after-save-hook #'check-parens nil t)))
+
+  :preface
+  (defun describe-symbol-at-point ()
+    "Describe the symbol at point."
+    (interactive)
+    (describe-symbol (or (symbol-at-point)
+                         (user-error "No symbol at point"))))
+
+  :bind (:map emacs-lisp-mode-map
+              ("C-q" . describe-symbol-at-point)))
 
 
 (use-package make-mode
@@ -1555,11 +1654,7 @@ no region is activated, this will operate on the entire buffer."
          ("\\.m\\'"                   . c-mode)
          ("\\.mm\\'"                  . c++-mode))
   :hook
-  (c-mode-common
-   . (lambda ()
-       (cwarn-mode 1)
-       (google-set-c-style)
-       (google-make-newline-indent)))
+  (c-mode-common . cwarn-mode)
 
   :config
   (unbind-key "C-c C-c" c++-mode-map))
@@ -1814,9 +1909,36 @@ no region is activated, this will operate on the entire buffer."
 ;;
 ;; Configure additional keybindings
 ;;
-(bind-key "C-x k"           #'kill-current-buffer)
-(bind-key "<C-M-backspace>" #'backward-kill-sexp)
+(defun close-help-or-keyboard-quit ()
+  "Close *Help* window if visible, otherwise `keyboard-quit'."
+  (interactive)
+  (if-let ((win (get-buffer-window "*Help*")))
+      (quit-window nil win)
+    (keyboard-quit)))
+
+;; `C-g' is `keyboard-quit' by default, but I want it to close the
+;; *Help* window if it's visible.
+(bind-key "C-g" #'close-help-or-keyboard-quit)
+;; `C-x k' is `kill-buffer' by default.
+(bind-key "C-x k" #'kill-current-buffer)
+;; `C-z' is `suspend-frame' by default, but I don't use it and might
+;; accidentally suspend Emacs.
 (when (display-graphic-p) (unbind-key "C-z"))
+
+;; GC was suspended in the early-init.el during startup to speed up
+;; initialization. Restore GC config and run GC after Emacs startup.
+;; `after-init-hook' runs right after your init file is loaded, but
+;; before the initial frame is fully set up and before the startup
+;; screen/scratch buffer is displayed.
+;; `emacs-startup-hook' runs after `after-init-hook', and after the
+;; command-line has been fully processed, the startup screen has been
+;; displayed, and everything is ready.
+(add-hook 'after-init-hook
+          #'(lambda ()
+              (setq gc-cons-percentage 0.5
+                    gc-cons-threshold (* 128 1024 1024))
+              (garbage-collect))
+          t)
 
 ;;
 ;; Display elapsed time and GC count

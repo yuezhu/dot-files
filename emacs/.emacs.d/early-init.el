@@ -1,14 +1,13 @@
-;; -*- lexical-binding: t; -*-
+;;; early-init.el --- ... -*- lexical-binding: t -*-
 
 ;; Disable native compilation entirely
 (setq native-comp-speed -1
       native-comp-jit-compilation nil)
 
-;; Set the garbage collector threshold, to avoid collections
-;; To avoid collections while loading the `init.el', they must be set using
-;; the `early-init.el'.
-(setq gc-cons-percentage 0.5
-      gc-cons-threshold (* 128 1024 1024))
+;; GC runs when new allocations since the last GC exceed a
+;; threshold: max(gc-cons-threshold, gc-cons-percentage * heap-size)
+;; Suppress GC during init
+(setq gc-cons-threshold most-positive-fixnum)
 
 ;; Disable UI elements early
 ;; https://github.com/doomemacs/doomemacs/blob/master/lisp/doom-start.el#L110
