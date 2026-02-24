@@ -345,16 +345,10 @@ Usage:
 (use-package simple
   :defer t
   :diminish auto-fill-function
-  :hook ((markdown-mode
-          prog-mode
-          protobuf-mode
-          org-mode)
-         . turn-on-auto-fill)
-  :hook (((compilation-mode
-           dired-mode
-           speedbar-mode
-           occur-mode)
-          . (lambda () (visual-line-mode -1))))
+  :hook
+  ((prog-mode protobuf-mode) . turn-on-auto-fill)
+  :hook
+  (text-mode . visual-line-mode)
   :custom
   (column-number-mode t)
   (indent-tabs-mode nil)
@@ -925,14 +919,7 @@ this is effective with some expand functions, eg.,
   :custom
   (imenu-auto-rescan t)
   (imenu-auto-rescan-maxout 600000)
-  (imenu-max-item-length "Unlimited")
-  :hook
-  ((prog-mode
-    conf-mode
-    outline-mode
-    markdown-mode
-    package-menu-mode)
-   . imenu-add-menubar-index))
+  (imenu-max-item-length "Unlimited"))
 
 
 (use-package crux
@@ -1295,6 +1282,7 @@ this is effective with some expand functions, eg.,
   ;; (org-default-notes-file (concat
   ;;                          (file-name-as-directory org-directory)
   ;;                          "notes.org"))
+  (org-confirm-babel-evaluate nil)
   (org-edit-src-content-indentation 0)
   (org-export-default-language "en")
   (org-export-with-creator t)
@@ -1318,18 +1306,32 @@ this is effective with some expand functions, eg.,
       :jump-to-captured t)))
 
   (org-publish-project-alist
-   '(("org"
+   '(("org-file"
       :base-directory "~/org/"
       :base-extension "org"
       :publishing-function org-html-publish-to-html
       :publishing-directory "~/.www/org"
       :recursive t)
-     ("org-roam"
+     ("org-static"
+      :base-directory "~/org/static/"
+      :base-extension "png\\|jpg\\|jpeg\\|gif\\|svg\\|css\\|pdf"
+      :publishing-function org-publish-attachment
+      :publishing-directory "~/.www/org/static"
+      :recursive t)
+     ("org" :components ("org-file" "org-static"))
+     ("org-roam-file"
       :base-directory "~/org-roam/"
       :base-extension "org"
       :publishing-function org-html-publish-to-html
       :publishing-directory "~/.www/org-roam"
-      :recursive t)))
+      :recursive t)
+     ("org-roam-static"
+      :base-directory "~/org-roam/static/"
+      :base-extension "png\\|jpg\\|jpeg\\|gif\\|svg\\|css\\|pdf"
+      :publishing-function org-publish-attachment
+      :publishing-directory "~/.www/org-roam/static"
+      :recursive t)
+     ("org-roam" :components ("org-file" "org-static"))))
 
   :config
   (unless (file-directory-p org-directory)
@@ -1338,7 +1340,17 @@ this is effective with some expand functions, eg.,
   (add-to-list 'display-buffer-alist
                '("\\`\\*Org Select\\*\\|\\*Agenda Commands\\*\\'"
                  (display-buffer-at-bottom)
-                 (inhibit-same-window . t))))
+                 (inhibit-same-window . t)))
+
+  (org-babel-do-load-languages
+   'org-babel-load-languages
+   '((emacs-lisp . t)
+     (python . t)
+     (shell . t)
+     (plantuml . t)))
+
+  (with-eval-after-load 'plantuml-mode
+    (setq org-plantuml-jar-path plantuml-jar-path)))
 
 
 (use-package org-indent
