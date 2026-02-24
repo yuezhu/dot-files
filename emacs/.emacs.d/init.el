@@ -67,7 +67,7 @@ Usage:
 ;; Some packages are built into Emacs, but I want to use the ELPA
 ;; versions.
 (defconst package-must-use-elpa-packages
-  '(org eldoc flymake eglot)
+  '()
   "A list of packages that must use the ELPA versions.")
 
 (advice-add 'package-installed-p :around
