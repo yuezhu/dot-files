@@ -1522,12 +1522,6 @@ This only affects the current markdown buffer, and does not add the
   :bind ([remap fill-paragraph] . unfill-toggle))
 
 
-(use-package adaptive-wrap
-  :ensure t
-  :defer t
-  :hook (visual-line-mode . adaptive-wrap-prefix-mode))
-
-
 (use-package reformatter
   :ensure t
   :defer t
