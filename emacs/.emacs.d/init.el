@@ -112,8 +112,22 @@ Usage:
   :commands diminish)
 
 
+;; (use-package emacs ...) is a common idiom for configuring built-in
+;; Emacs settings that don't belong to any specific package.  Since
+;; "emacs" is not a real package, `use-package' treats it as always
+;; loaded, so all forms (:init, :config, :custom) run immediately at
+;; init time with no deferral.
+;; Refer to lisp/loadup.el for the core libraries always loaded
+;; during Emacs startup, and src/*.c for C-level primitives and
+;; their default values.
 (use-package emacs
-  :defer t
+  :diminish auto-fill-function
+
+  :hook
+  ((prog-mode protobuf-mode) . turn-on-auto-fill)
+  :hook
+  (text-mode . visual-line-mode)
+
   :custom
   ;; src/nsterm.m
   (ns-alternate-modifier 'super)
@@ -189,7 +203,29 @@ Usage:
   ;; minibuffer to switch display modes.
   (context-menu-mode t)
 
+  ;; simple.el
+  (column-number-mode t)
+  (indent-tabs-mode nil)
+  (line-number-mode t)
+  (size-indication-mode t)
+  (transient-mark-mode t)
+
+  (global-mark-ring-max 500)
+  (mark-ring-max 100)
+
+  (kill-do-not-save-duplicates t)
+  (kill-ring-max 1000000)
+  (kill-whole-line nil)
+
+  (next-line-add-newlines nil)
+
+  (visual-line-fringe-indicators
+   '(left-curly-arrow right-curly-arrow))
+
   ;; startup.el
+  ;; `simple' is one of Emacs's core built-in libraries. It provides a
+  ;; large collection of fundamental editing commands and utilities
+  ;; that are so basic they're loaded by default.
   (inhibit-startup-screen t)
   (initial-major-mode 'fundamental-mode)
   (initial-scratch-message nil)
@@ -340,30 +376,6 @@ Usage:
    . (lambda ()
        (display-fill-column-indicator-mode
         (if auto-fill-function 1 -1)))))
-
-
-(use-package simple
-  :defer t
-  :diminish auto-fill-function
-  :hook
-  ((prog-mode protobuf-mode) . turn-on-auto-fill)
-  :hook
-  (text-mode . visual-line-mode)
-  :custom
-  (column-number-mode t)
-  (indent-tabs-mode nil)
-  (line-number-mode t)
-  (size-indication-mode t)
-  (transient-mark-mode t)
-
-  (global-mark-ring-max 500)
-  (mark-ring-max 100)
-
-  (kill-do-not-save-duplicates t)
-  (kill-ring-max 1000000)
-  (kill-whole-line nil)
-
-  (next-line-add-newlines nil))
 
 
 (use-package ns-win
@@ -1508,6 +1520,12 @@ This only affects the current markdown buffer, and does not add the
   :ensure t
   :defer t
   :bind ([remap fill-paragraph] . unfill-toggle))
+
+
+(use-package adaptive-wrap
+  :ensure t
+  :defer t
+  :hook (visual-line-mode . adaptive-wrap-prefix-mode))
 
 
 (use-package reformatter
