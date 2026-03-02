@@ -420,7 +420,6 @@ Usage:
 
 
 (use-package eldoc
-  :ensure t
   :defer 2
   :diminish
   :hook
@@ -1272,43 +1271,101 @@ this is effective with some expand functions, eg.,
          ("C-c c" . org-capture)
          ("C-c l" . org-store-link))
 
+  :preface
+  (defun org-babel-enable-languages (&rest langs)
+    "Enable one or more org-babel languages.
+Each element of LANGS should be a cons cell (STRING . SYMBOL),
+e.g. (\"plantuml\" . plantuml).
+Duplicates are skipped based on the language name (car)."
+    (dolist (lang langs)
+      (unless (assoc (car lang) org-babel-load-languages)
+        (add-to-list 'org-babel-load-languages lang)))
+    ;; Call `org-babel-do-load-languages' to ensure that the new
+    ;; language is registered.
+    (org-babel-do-load-languages 'org-babel-load-languages
+                                 org-babel-load-languages))
+
+  (defun org-copy-top-heading-id ()
+    "Copy the org ID of the topmost heading of the current section to the
+kill ring.  Displays the heading text in the minibuffer. If no ID
+exists, does nothing."
+    (interactive)
+    (save-excursion
+      (org-back-to-heading t)
+      (while (org-up-heading-safe))
+      (let* ((heading (org-get-heading t t t t))
+             (id (org-id-get)))
+        (if (not id)
+            (message "No org ID found for heading '%s'" heading)
+          (kill-new id)
+          (message "Copied ID for heading '%s': %s" heading id)))))
+
   :hook
-  (org-mode
-   . (lambda ()
-       ;; (setq-local fill-column 120)
-       ;; (setq-local electric-pair-pairs
-       ;;             (append electric-pair-pairs '((?* . ?*)
-       ;;                                           (?/ . ?/)
-       ;;                                           (?_ . ?_)
-       ;;                                           (?= . ?=)
-       ;;                                           (?~ . ?~)
-       ;;                                           (?+ . ?+))))
-       ;; (setq-local electric-pair-text-pairs electric-pair-pairs)
-       ))
+  (org-capture-prepare-finalize . org-copy-top-heading-id)
 
   :custom
+  ;; Root directory for all org files
+  (org-directory "~/org")
+
   (org-agenda-files `(,(file-name-as-directory org-directory)))
-  (org-blank-before-new-entry '((heading)
-                                (plain-list-item)))
-  (org-clone-delete-id t)
+
   ;; (org-default-notes-file (concat
   ;;                          (file-name-as-directory org-directory)
   ;;                          "notes.org"))
+
+  ;; Do not ask for confirmation when evaluating code blocks
   (org-confirm-babel-evaluate nil)
-  (org-edit-src-content-indentation 0)
+
   (org-export-default-language "en")
   (org-export-with-creator t)
   (org-export-with-section-numbers nil)
   (org-export-with-sub-superscripts '{})
-  (org-export-with-toc nil)
-  (org-hide-emphasis-markers t)
+
+  ;; Include a table of contents in exported documents
+  (org-export-with-toc t)
+
+  ;; Do not hide markup characters (e.g. show bold instead of *bold*)
+  (org-hide-emphasis-markers nil)
+
+  ;; Hide the first N-1 stars in a headline
   (org-hide-leading-stars t)
+
+  ;; Allow single character alphabetical bullets
+  (org-list-allow-alphabetical t)
   (org-log-done 'time)
   (org-log-reschedule 'time)
+
+  ;; Do no timestamp checking and always publish all files
   (org-publish-use-timestamps-flag nil)
+
+  ;; When editing source code blocks, use the current window
   (org-src-window-setup 'current-window)
-  ;; (org-startup-folded "nofold")
+
+  ;; Visually indent content under headings to align with heading
+  ;; text. No actual spaces are inserted; this is purely a display
+  ;; effect.
   (org-startup-indented t)
+
+  ;; Do not fold heading content on startup
+  (org-startup-folded 'nofold)
+
+  ;; Hide drawers (including :PROPERTIES:) on startup
+  (org-hide-drawer-startup t)
+
+  ;; Do not auto-break long lines when typing; keep paragraphs on one
+  ;; line
+  (org-auto-align-tags nil)
+
+  ;; Display tags immediately after the heading text, without column
+  ;; alignment
+  (org-tags-column 0)
+
+  ;; When creating a link to a heading, automatically assign an org ID
+  ;; to it. This enables precise heading-level links.
+  ;; (org-id-link-to-org-use-id t)
+  ;; Remove ID property of clones of a subtree
+  (org-clone-delete-id t)
+
   (org-yank-adjusted-subtrees t)
 
   (org-capture-templates
@@ -1343,66 +1400,254 @@ this is effective with some expand functions, eg.,
       :publishing-function org-publish-attachment
       :publishing-directory "~/.www/org-roam/static"
       :recursive t)
-     ("org-roam" :components ("org-file" "org-static"))))
+     ("org-roam" :components ("org-file" "org-static")))
+
+   (org-todo-keywords
+    '((sequence "TODO(t)" "IN-PROGRESS(i)" "WAITING(w)" "|" "DONE(d)" "CANCELLED(c)"))))
 
   :config
-  (unless (file-directory-p org-directory)
-    (make-directory org-directory))
+  (make-directory org-directory t)
 
+  ;; Make org agenda and org capture buffers appear at the bottom of
+  ;; the frame, and prevent them from taking over the current window.
   (add-to-list 'display-buffer-alist
                '("\\`\\*Org Select\\*\\|\\*Agenda Commands\\*\\'"
                  (display-buffer-at-bottom)
                  (inhibit-same-window . t)))
 
-  (org-babel-do-load-languages
-   'org-babel-load-languages
-   '((emacs-lisp . t)
-     (python . t)
-     (shell . t)
-     (plantuml . t)))
-
+  ;; Set the path to the PlantUML JAR file for org-babel. This allows
+  ;; you to execute PlantUML code blocks in org files and have them
+  ;; render diagrams using the specified JAR.
   (with-eval-after-load 'plantuml-mode
-    (setq org-plantuml-jar-path plantuml-jar-path)))
+    (setq org-plantuml-jar-path plantuml-jar-path))
+
+  ;; Enable execution of PlantUML code blocks in org files
+  (org-babel-enable-languages '(plantuml . t)))
 
 
+;; `org-indent-mode' is a minor mode that visually indents text
+;; according to the outline structure of the document. It is bundled
+;; with `org'; no separate :ensure needed.
 (use-package org-indent
-  ;; It is part of `org'
   :defer t
   :after org
   :diminish org-indent-mode)
 
 
+;; `org-make-toc-mode' is a minor mode that automatically generates a
+;; table of contents for an org file.
 (use-package org-make-toc
   :ensure t
   :after org
   :hook (org-mode . org-make-toc-mode))
 
 
+;; `ox-gfm' is an org export backend that exports to GitHub Flavored
+;; Markdown.
 (use-package ox-gfm
   :ensure t
   :after org)
 
 
+;; `org-modern' is a minor mode that provides modern visual
+;; enhancements for `org-mode'.
+(use-package org-modern
+  :ensure t
+  :after org
+  :defer t)
+
+
+;; `ob-mermaid' is an org-babel language extension that allows you to
+;; execute Mermaid code blocks in org files and have them render
+;; diagrams.
+(use-package ob-mermaid
+  :ensure t
+  :after org
+  :config
+  ;; Enable execution of Mermaid code blocks in org files
+  (org-babel-enable-languages '(mermaid . t)))
+
+
+;; `org-roam' is a note-taking tool that allows you to create and
+;; manage a network of interconnected notes.
 (use-package org-roam
   :ensure t
   :defer t
+  :preface
+  (defun org-roam-node-hierarchy (node)
+    "Return full hierarchy path for NODE."
+    (let ((title (org-roam-node-title node))
+          (olp (org-roam-node-olp node))
+          (file-title (org-roam-node-file-title node)))
+      (string-join
+       (delq nil
+             (append
+              (when (and file-title (not (string= file-title title)))
+                (list file-title))
+              olp
+              (list title)))
+       " > ")))
+
   :custom
-  (org-roam-directory (file-truename "~/org-roam"))
+  ;; Root directory that `org-roam' files; all node files live here
+  (org-roam-directory "~/org-roam")
+
+  ;; Location of the SQLite database that indexes all nodes and links
+  (org-roam-db-location "~/org-roam/org-roam.db")
+
+  ;; Automatically update the database whenever a roam file is saved.
+  ;; This keeps backlinks accurate in real time at a small cost to
+  ;; save speed.
+  (org-roam-db-update-on-save t)
+
+  ;; Allow org headings that have an :ID: property to be treated as
+  ;; first-class roam nodes, not just the file-level #+title node.
+  ;; This is what makes it possible to link to a specific meeting-log
+  ;; heading (e.g. "** 2026-03-01") rather than just the top of the
+  ;; meeting file.
+  (org-roam-db-node-include-refs t)
+
+  ;; Control how each node appears in the completion list shown by
+  ;; `org-roam-node-find' and `org-roam-node-insert'.
+  (org-roam-node-display-template
+   (concat "${hierarchy:*} " (propertize "${tags:40}" 'face 'bold)))
+
+  ;; Subdirectory for daily note files, relative to
+  ;; org-roam-directory.  Resolves to ~/org/roam/daily/
+  (org-roam-dailies-directory "daily/")
+
+  (org-roam-capture-templates
+   '(
+     ;; Default Notes
+     ("d" "Default" plain
+      "%?"
+      ;; ${slug} is the URL-safe version of ${title}:
+      ;; spaces become hyphens, special characters are dropped.
+      ;; e.g. title "My Project Notes" → slug "my-project-notes"
+      :target (file+head
+               "%<%Y%m%d%H%M%S>-${slug}.org"
+               "#+title: ${title}
+#+created: %T
+")
+      :unnarrowed t)
+
+     ;; Meeting Notes
+     ;;
+     ;; Single template that handles both first-time creation and
+     ;; subsequent appends for the same meeting node.
+     ;;
+     ;; First run (file does not exist): `org-roam' prompts for a
+     ;;   title, then file+head+olp creates the file using the header
+     ;;   template (which includes the Context section, prompted by
+     ;;   %^{Context}), creates the "Meeting Notes" heading, and
+     ;;   inserts the first dated entry.
+     ;;
+     ;; Later runs (file already exists): The header template is
+     ;;   skipped entirely. `org-roam' finds the existing file via the
+     ;;   title search, navigates to "Meeting Notes", and appends a
+     ;;   new dated entry with a freshly generated ID.  The
+     ;;   %^{Context} prompt does NOT appear because they live inside
+     ;;   the header which is now ignored.
+     ("m" "Meeting Notes" entry
+      ;; entry type: `org-capture' prepends "* " automatically, so
+      ;; this content becomes a sub-heading under "Meeting Notes".
+      ;; %^u pops up a calendar; the chosen date becomes the heading
+      ;; title.  Using inactive timestamp so individual meeting
+      ;; headings do not flood the org agenda.
+      ;; %(org-id-new) is evaluated at expansion time and produces a
+      ;; %UUID.
+      "
+* %^u
+:PROPERTIES:
+:ID:       %(org-id-new)
+:END:
+%?"
+      :target (file+head+olp
+               ;; path: node files go into the meetings/ subdirectory
+               "meetings/${slug}.org"
+               ;; header: used only when the file is created for the
+               ;; first time; %^{} prompts appear here because this is
+               ;; first-run only
+               "
+#+title: ${title}
+#+filetags: :meeting:
+
+* Context
+%^{Context}
+
+* Meeting Notes
+"
+               ;; olp: always insert under the "Meeting Notes" heading
+               ("Meeting Notes"))
+      :prepend t)
+     ))
+
+  ;; These are separate from `org-roam-capture-templates' and are
+  ;; only triggered by org-roam-dailies-* commands.
+  ;; The :target path is relative to `org-roam-dailies-directory'.
+  (org-roam-dailies-capture-templates
+   '(
+     ;; Timestamped daily journal entry
+     ("d" "Daily Journal" entry
+      ;; A top-level heading with the current time as its title
+      "* %<%H:%M> %?"
+      :target (file+head "%<%Y-%m-%d>.org"
+                         "
+#+title: %<%Y-%m-%d>
+#+filetags: :daily:
+"))
+
+     ;; Meeting Notes reference entry
+     ;;
+     ;; Use this after finishing a meeting capture (template "m"
+     ;; above). By the time you trigger this template the meeting ID
+     ;; should be copied to the clipboard, so you only need to type
+     ;; C-c C-l → id: → C-y to paste it as a link.
+     ;;
+     ;; Workflow:
+     ;;   1. C-c n c → m          capture the meeting entry (ID auto-copied)
+     ;;   2. C-c n d c → l        open this template in today's daily
+     ;;   3. at the Link: line:   C-c C-l → type "id:" → C-y to paste the ID
+     ;;                           → RET → type a description → RET
+     ;;   4. C-c C-c              confirm and save
+     ("l" "Meeting Link" entry
+      ;; %^{Meeting name} prompts for the meeting name used as the heading title
+      "
+* %?"
+      :target (file+head+olp
+               "%<%Y-%m-%d>.org"
+               "
+#+title: %<%Y-%m-%d>
+#+filetags: :daily:
+"
+               ;; All meeting references in a daily go under the
+               ;; "Meetings" section
+               ("Meetings")))
+     ))
 
   :bind (("C-c n l" . org-roam-buffer-toggle)
          ("C-c n f" . org-roam-node-find)
          ("C-c n g" . org-roam-graph)
          ("C-c n i" . org-roam-node-insert)
          ("C-c n c" . org-roam-capture)
-         ;; Dailies
-         ("C-c n j" . org-roam-dailies-capture-today))
+
+         ;; `org-roam-dailies' commands
+         ("C-c n d t" . org-roam-dailies-goto-today)      ;; open today's daily note
+         ("C-c n d y" . org-roam-dailies-goto-yesterday)  ;; open yesterday's daily note
+         ("C-c n d c" . org-roam-dailies-capture-today)   ;; capture into today's daily
+         ("C-c n d n" . org-roam-dailies-goto-next-note)  ;; navigate to the next day
+         ("C-c n d p" . org-roam-dailies-goto-prev-note)  ;; navigate to the previous day
+         )
 
   :config
-  (unless (file-directory-p org-roam-directory)
-    (make-directory org-roam-directory))
-  (setq org-roam-node-display-template
-        (concat "${title:*} "
-                (propertize "${tags:10}" 'face 'org-tag)))
+  ;; Ensure the meetings/ subdirectory exists. The Meeting Notes
+  ;; capture template expects to find it.
+  (make-directory (concat (file-name-as-directory org-roam-directory)
+                          "meetings")
+                  t)
+
+  ;; Start the background process that keeps the database in sync with
+  ;; files on disk
   (org-roam-db-autosync-mode))
 
 
@@ -1651,7 +1896,10 @@ no region is activated, this will operate on the entire buffer."
                          (user-error "No symbol at point"))))
 
   :bind (:map emacs-lisp-mode-map
-              ("C-q" . describe-symbol-at-point)))
+              ("C-q" . describe-symbol-at-point))
+
+  :custom
+  (emacs-lisp-docstring-fill-column fill-column))
 
 
 (use-package make-mode
