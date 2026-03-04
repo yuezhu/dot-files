@@ -1359,14 +1359,15 @@ kill ring.  Displays the heading text in the minibuffer. If no ID
 exists, does nothing."
     (interactive)
     (save-excursion
-      (org-back-to-heading t)
-      (while (org-up-heading-safe))
-      (let* ((heading (org-get-heading t t t t))
-             (id (org-id-get)))
-        (if (not id)
-            (message "No org ID found for heading '%s'" heading)
-          (kill-new id)
-          (message "Copied ID for heading '%s': %s" heading id)))))
+      (unless (org-before-first-heading-p)
+        (org-back-to-heading t)
+        (while (org-up-heading-safe))
+        (let* ((heading (org-get-heading t t t t))
+               (id (org-id-get)))
+          (if (not id)
+              (message "No org ID found for heading '%s'" heading)
+            (kill-new id)
+            (message "Copied ID for heading '%s': %s" heading id))))))
 
   :hook
   (org-capture-prepare-finalize . org-copy-top-heading-id)
