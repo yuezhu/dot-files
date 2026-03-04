@@ -1450,10 +1450,10 @@ exists, does nothing."
       :publishing-directory "~/.www/org"
       :recursive t)
      ("org-static"
-      :base-directory "~/org/static/"
+      :base-directory "~/org/"
       :base-extension "png\\|jpg\\|jpeg\\|gif\\|svg\\|css\\|pdf"
       :publishing-function org-publish-attachment
-      :publishing-directory "~/.www/org/static"
+      :publishing-directory "~/.www/org/"
       :recursive t)
      ("org" :components ("org-file" "org-static"))
      ("org-roam-file"
@@ -1463,10 +1463,10 @@ exists, does nothing."
       :publishing-directory "~/.www/org-roam"
       :recursive t)
      ("org-roam-static"
-      :base-directory "~/org-roam/static/"
+      :base-directory "~/org-roam/"
       :base-extension "png\\|jpg\\|jpeg\\|gif\\|svg\\|css\\|pdf"
       :publishing-function org-publish-attachment
-      :publishing-directory "~/.www/org-roam/static"
+      :publishing-directory "~/.www/org-roam/"
       :recursive t)
      ("org-roam" :components ("org-file" "org-static")))
 
