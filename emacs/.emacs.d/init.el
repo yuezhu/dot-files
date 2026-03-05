@@ -892,8 +892,6 @@ this is effective with some expand functions, eg.,
 
 
 (use-package abbrev
-  ;; Defer does not work. It is loaded somewhere else.
-  ;; 09/11/20 `enh-ruby-mode' loads `abbrev'.
   :defer t
   :diminish
   :hook
@@ -1782,8 +1780,7 @@ This only affects the current markdown buffer, and does not add the
   :config
   (put 'hes-escape-backslash-face 'face-alias 'font-lock-builtin-face)
   (put 'hes-escape-sequence-face 'face-alias 'font-lock-builtin-face)
-  (push `(json-mode . ,hes-js-escape-sequence-re) hes-mode-alist)
-  (push `(enh-ruby-mode . ,hes-ruby-escape-sequence-keywords) hes-mode-alist))
+  (push `(json-mode . ,hes-js-escape-sequence-re) hes-mode-alist))
 
 
 (use-package git-link
@@ -2036,17 +2033,6 @@ no region is activated, this will operate on the entire buffer."
   :disabled
   :defer t
   :interpreter "ruby")
-
-
-(use-package enh-ruby-mode
-  :ensure t
-  :defer t
-  :mode "\\(?:\\.rb\\|ru\\|rake\\|thor\\|jbuilder\\|gemspec\\|podspec\\|/\\(?:Gem\\|Rake\\|Cap\\|Thor\\|Vagrant\\|Guard\\|Pod\\)file\\)\\'"
-  :interpreter "ruby"
-  :hook
-  (enh-ruby-mode . (lambda () (setq-local tab-width 2)))
-  :custom
-  (enh-ruby-check-syntax nil))
 
 
 (use-package lua-mode
