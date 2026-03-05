@@ -873,22 +873,7 @@ this is effective with some expand functions, eg.,
 
 (use-package eglot
   :ensure t
-  ;; 2023-07-31 manually start
-  ;; :hook
-  ;; ((go-mode
-  ;;   c-mode
-  ;;   c++-mode
-  ;;   python-mode)
-  ;;  . eglot-ensure)
-
   :defer t
-
-  :bind (:map eglot-mode-map
-              ("C-c l d" . eglot-find-declaration)
-              ("C-c l t" . eglot-find-typeDefinition)
-              ("C-c l i" . eglot-find-implementation)
-              ("C-c l r" . eglot-rename))
-
   :custom
   (eglot-autoshutdown t)
   (eglot-events-buffer-size 0)
@@ -959,9 +944,15 @@ this is effective with some expand functions, eg.,
   :init
   (vertico-mode)
 
+  :hook
+  (minibuffer-setup
+   . (lambda ()
+       "Allow `vertico' to use half the frame height."
+       (setq-local vertico-count (/ (frame-height) 2))))
+
   :custom
   ;; (vertico-scroll-margin 0) ;; Different scroll margin
-  (vertico-count 20) ;; Show more candidates
+  ;; (vertico-count 20) ;; Show more candidates
   ;; (vertico-resize t) ;; Grow and shrink the Vertico minibuffer
   ;; (vertico-cycle t) ;; Enable cycling for `vertico-next/previous'
   (vertico-multiform-commands
@@ -1000,8 +991,8 @@ this is effective with some expand functions, eg.,
          ("M-'" . consult-register-store)          ;; orig. abbrev-prefix-mark (unrelated)
          ("C-M-#" . consult-register)
          ;; Other custom bindings
-         ("M-y" . consult-yank-pop)                ;; orig. yank-pop
-         ;; ("M-y" . consult-yank-replace)
+         ;; ("M-y" . consult-yank-pop)                ;; orig. yank-pop
+         ("M-y" . consult-yank-replace)
          ;; M-g bindings in `goto-map'
          ("M-g e" . consult-compile-error)
          ("M-g r" . consult-grep-match)
