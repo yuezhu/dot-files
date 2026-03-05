@@ -1342,10 +1342,9 @@ Duplicates are skipped based on the language name (car)."
     (org-babel-do-load-languages 'org-babel-load-languages
                                  org-babel-load-languages))
 
-  (defun org-copy-top-heading-id ()
-    "Copy the org ID of the topmost heading of the current section to the
-kill ring.  Displays the heading text in the minibuffer. If no ID
-exists, does nothing."
+  (defun org-copy-current-topmost-heading-id ()
+    "Copy the org ID of the current topmost heading to the kill ring.
+If no ID exists, this does nothing."
     (interactive)
     (save-excursion
       (unless (org-before-first-heading-p)
@@ -1359,7 +1358,7 @@ exists, does nothing."
             (message "Copied ID for heading '%s': %s" heading id))))))
 
   :hook
-  (org-capture-prepare-finalize . org-copy-top-heading-id)
+  (org-capture-prepare-finalize . org-copy-current-topmost-heading-id)
 
   :custom
   ;; Root directory for all org files
@@ -1531,21 +1530,6 @@ exists, does nothing."
 (use-package org-roam
   :ensure t
   :defer t
-  :preface
-  (defun org-roam-node-hierarchy (node)
-    "Return full hierarchy path for NODE."
-    (let ((title (org-roam-node-title node))
-          (olp (org-roam-node-olp node))
-          (file-title (org-roam-node-file-title node)))
-      (string-join
-       (delq nil
-             (append
-              (when (and file-title (not (string= file-title title)))
-                (list file-title))
-              olp
-              (list title)))
-       " > ")))
-
   :custom
   ;; Root directory that `org-roam' files; all node files live here
   (org-roam-directory "~/org-roam")
@@ -1706,7 +1690,34 @@ exists, does nothing."
 
   ;; Start the background process that keeps the database in sync with
   ;; files on disk
-  (org-roam-db-autosync-mode))
+  (org-roam-db-autosync-mode)
+
+
+  ;; Why does this go here and not in the :preface section?
+  ;;
+  ;; `cl-defmethod' declares (node org-roam-node) in its parameter
+  ;; list, which tells Emacs this method specializes on the
+  ;; `org-roam-node' type. At definition time, Emacs needs to resolve
+  ;; that type — if it doesn't exist yet, you get the "unknown
+  ;; specializer" error.
+  ;; `org-roam-node' is defined by a `cl-defstruct' inside the
+  ;; `org-roam' package. So,`org-roam' must have been loaded for the
+  ;; `cl-defstruct' to register the type and for `org-roam-node' to be
+  ;; available.
+  (cl-defmethod org-roam-node-hierarchy ((node org-roam-node))
+    "Return full hierarchy path for NODE."
+    (let ((title (org-roam-node-title node))
+          (olp (org-roam-node-olp node))
+          (file-title (org-roam-node-file-title node)))
+      (string-join
+       (delq nil
+             (append
+              (when (and file-title (not (string= file-title title)))
+                (list file-title))
+              olp
+              (list title)))
+       " > ")))
+  )
 
 
 ;; This is needed for `org-mode' to fontify code blocks.
@@ -1811,7 +1822,6 @@ This only affects the current markdown buffer, and does not add the
 
 
 (use-package which-key
-  :ensure t
   :defer 2
   :diminish
   :config
