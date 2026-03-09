@@ -519,6 +519,16 @@ Usage:
   (show-paren-style 'parentheses))
 
 
+(use-package calendar
+  :defer t
+  :config
+  (add-to-list 'display-buffer-alist
+               '("\\`\\*Calendar\\*\\'"
+                 (display-buffer-at-bottom)
+                 (inhibit-same-window . t)
+                 (window-height . 0.5))))
+
+
 (use-package recentf
   :defer 2
   :preface
