@@ -8,3 +8,7 @@
 !/mpv/.config/mpv/input.conf
 !/mpv/.config/mpv/mpv.conf
 !/mpv/.config/mpv/scripts
+
+/claude/.claude/*
+!/claude/.claude/settings.json
+!/claude/.claude/bin

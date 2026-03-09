@@ -1,0 +1,26 @@
+{
+  "cleanupPeriodDays": 365,
+  "permissions": {
+    "defaultMode": "plan"
+  },
+  "hooks": {
+    "Notification": [
+      {
+        "matcher": "permission_prompt|auth_success|elicitation_dialog",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh ~/.claude/bin/notify-bell.sh"
+          }
+        ]
+      }
+    ]
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "sh ~/.claude/bin/statusline-command.sh",
+    "padding": 0
+  },
+  "alwaysThinkingEnabled": true,
+  "model": "opus[1m]"
+}
