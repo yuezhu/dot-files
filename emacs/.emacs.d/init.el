@@ -632,9 +632,7 @@ ignore stuff starting with \"http\" or \"https\"."
 
 (use-package flymake
   :ensure t
-  :defer t
-  :hook
-  (prog-mode . flymake-mode))
+  :defer t)
 
 
 (use-package flycheck
@@ -1187,9 +1185,7 @@ this is effective with some expand functions, eg.,
               ("C-<tab>" . copilot-accept-completion-by-word)
               ("C-TAB" . copilot-accept-completion-by-word)
               ("M-n" . copilot-next-completion)
-              ("M-p" . copilot-previous-completion))
-  :hook
-  ((text-mode prog-mode conf-mode) . copilot-mode))
+              ("M-p" . copilot-previous-completion)))
 
 
 (use-package ace-window
