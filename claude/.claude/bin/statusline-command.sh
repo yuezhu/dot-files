@@ -15,7 +15,7 @@ eval $(jq -r '
   "COST=" + (.cost.total_cost_usd // 0 | tostring),
   "PCT=" + ((.context_window.used_percentage // 0) | floor | tostring),
   "DURATION_MS=" + (.cost.total_duration_ms // 0 | tostring),
-  "USED_TOKENS=" + (((.context_window.current_usage.input_tokens // 0) + (.context_window.current_usage.cache_creation_input_tokens // 0) + (.context_window.current_usage.cache_read_input_tokens // 0) + (.context_window.current_usage.output_tokens // 0)) | tostring),
+  "USED_TOKENS=" + (((.context_window.current_usage.input_tokens // 0) + (.context_window.current_usage.output_tokens // 0)) | tostring),
   "CTX_SIZE=" + ((.context_window.context_window_size // 0) | tostring)
 ')
 
