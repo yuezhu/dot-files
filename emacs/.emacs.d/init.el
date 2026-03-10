@@ -27,9 +27,8 @@
 (add-to-list 'load-path (expand-file-name "lisp" user-emacs-directory))
 
 
-;; Debugging utilities for package loading.  Useful for tracking down
-;; which package is loading a particular feature.
-(defun debug-package-load (feature)
+;; Tracking down which package is loading a particular feature.
+(defun trace-feature-load (feature)
   "Trace where FEATURE is loaded from.
 
 Add advice to both `require' and `load' to print a backtrace
@@ -39,7 +38,7 @@ the package in question could be loaded.
 FEATURE is a symbol, e.g. \\='reformatter.
 
 Usage:
-  (debug-package-load \\='reformatter)"
+  (trace-feature-load \\='reformatter)"
   (let ((name (symbol-name feature)))
     (advice-add 'require :before
                 `(lambda (feat &rest _)
@@ -56,7 +55,7 @@ Usage:
                 `((name . ,(intern (format "debug-%s-load" name)))))))
 
 
-;; (debug-package-load 'reformatter)
+;; (trace-feature-load 'reformatter)
 
 
 ;;
@@ -85,17 +84,19 @@ Usage:
 (unless package-archive-contents
   (package-refresh-contents))
 
-(advice-add 'package-upgrade-all :around
-            (lambda (func &rest _)
-              "Upgrade all packages without asking."
-              (funcall func)))
-
 ;;
 ;; Initialize `use-package'
-;; https://github.com/jwiegley/use-package
 ;;
-(setq use-package-enable-imenu-support t
-      use-package-verbose t)
+(setq use-package-always-defer t
+      use-package-enable-imenu-support t)
+
+;; `init-file-debug' will be t when Emacs is launched with the
+;; "--debug-init" command line flag.
+(when init-file-debug
+  (setq use-package-verbose t
+        use-package-expand-minimally nil
+        use-package-compute-statistics t
+        debug-on-error t))
 
 (unless (package-installed-p 'use-package)
   (package-install 'use-package))
@@ -121,6 +122,8 @@ Usage:
 ;; during Emacs startup, and src/*.c for C-level primitives and
 ;; their default values.
 (use-package emacs
+  :no-require t
+  :defer t
   :diminish auto-fill-function
 
   :hook
@@ -288,16 +291,9 @@ Usage:
 (use-package cus-edit
   :defer t
   :init
-  (setq custom-file (expand-file-name "custom.el" user-emacs-directory))
-  (setq custom-buffer-done-kill t)
-  ;; I don't use "M-x customize", so don't load `custom-file'.
-  ;; :config
-  ;; (load custom-file 'noerror)
-  ;; (let ((elapsed (float-time (time-subtract (current-time)
-  ;;                                           emacs-start-time))))
-  ;;   (message "Loading %s (source)...done (%.3fs) (GC: %d)"
-  ;;            custom-file elapsed gcs-done))
-  )
+  (setq custom-file (expand-file-name "custom.el"
+                                      user-emacs-directory)
+        custom-buffer-done-kill t))
 
 
 (use-package image-file
@@ -353,19 +349,21 @@ Usage:
 
 (use-package hl-line
   :defer t
-  :hook ((compilation-mode
-          gnus-mode
-          ibuffer-mode
-          magit-mode
-          occur-mode
-          dired-mode)
-         . hl-line-mode))
+  :hook
+  ((compilation-mode
+    gnus-mode
+    ibuffer-mode
+    magit-mode
+    occur-mode
+    dired-mode)
+   . hl-line-mode))
 
 
 (use-package goto-addr
   :defer t
   :hook
   (prog-mode . goto-address-prog-mode)
+  :hook
   ((text-mode magit-process-mode) . goto-address-mode))
 
 
@@ -376,12 +374,6 @@ Usage:
    . (lambda ()
        (display-fill-column-indicator-mode
         (if auto-fill-function 1 -1)))))
-
-
-(use-package ns-win
-  :defer t
-  :custom
-  (ns-pop-up-frames nil))
 
 
 (use-package subword
@@ -407,8 +399,6 @@ Usage:
 
 (use-package time
   :defer 2
-  :custom
-  (display-time-day-and-date nil)
   :config
   (display-time-mode t))
 
@@ -424,9 +414,6 @@ Usage:
   :diminish
   :hook
   (prog-mode . global-eldoc-mode)
-  :custom
-  ;; Show all the results eagerly
-  (eldoc-documentation-strategy #'eldoc-documentation-compose-eagerly)
   :config
   (global-eldoc-mode t))
 
@@ -442,13 +429,15 @@ Usage:
 
 
 (use-package electric
-  :init
-  (electric-indent-mode))
+  :defer t
+  :custom
+  (electric-indent-mode t))
 
 
 (use-package elec-pair
-  :init
-  (electric-pair-mode))
+  :defer t
+  :custom
+  (electric-pair-mode t))
 
 
 (use-package ediff-wind
@@ -466,8 +455,16 @@ Usage:
 (use-package exec-path-from-shell
   :if (memq window-system '(mac ns))
   :ensure t
+  :demand t
   :config
   (exec-path-from-shell-initialize))
+
+
+(use-package ns-win
+  :if (memq window-system '(mac ns))
+  :demand t
+  :custom
+  (ns-pop-up-frames nil))
 
 
 (use-package winner
@@ -564,11 +561,12 @@ Usage:
              recentf-string-member)
 
   :config
-  (recentf-mode)
+  (let ((inhibit-message t))
+    (recentf-mode 1))
 
   (advice-add 'recentf-cleanup :around
               (lambda (func &rest args)
-                "Do not echo the message onto minibuffer when cleaning up
+                "Do not print to the echo area when cleaning up
 `recentf-list'."
                 (let ((inhibit-message t))
                   (apply func args)))))
@@ -579,15 +577,18 @@ Usage:
   :bind (("C-c w m" . whitespace-mode)
          ("C-c w r" . whitespace-report)
          ("C-c w c" . whitespace-cleanup))
+
   :diminish (global-whitespace-mode
              whitespace-mode
              whitespace-newline-mode)
+
   :hook ((conf-mode
           json-mode
           ssh-config-mode
           yaml-mode
           makefile-mode)
          . whitespace-mode)
+
   :custom
   (whitespace-line-column 100)
   (whitespace-style '(face trailing tabs)))
@@ -613,6 +614,7 @@ Usage:
 
 
 (use-package flyspell
+  :defer t
   :bind ("C-c s b" . flyspell-buffer)
 
   :preface
@@ -626,8 +628,10 @@ ignore stuff starting with \"http\" or \"https\"."
 
   :hook
   (text-mode . flyspell-mode)
+
   :custom
   (flyspell-sort-corrections t)
+
   :config
   (dolist (mode '(text-mode org-mode)) ;; need to specify all derived modes
     (put mode 'flyspell-mode-predicate #'flyspell-ignore-http-and-https)))
@@ -635,13 +639,13 @@ ignore stuff starting with \"http\" or \"https\"."
 
 (use-package flyspell-correct
   :ensure t
+  :defer t
   :after flyspell
   :bind (:map flyspell-mode-map
               ("C-c s w" . flyspell-correct-wrapper)))
 
 
 (use-package flymake
-  :ensure t
   :defer t)
 
 
@@ -678,7 +682,10 @@ ignore stuff starting with \"http\" or \"https\"."
 
 
 (use-package ibuffer
+  :defer t
+
   :bind ("C-x C-b" . ibuffer)
+
   :hook
   (ibuffer-mode . ibuffer-auto-mode)
   (ibuffer . (lambda ()
@@ -709,6 +716,7 @@ ignore stuff starting with \"http\" or \"https\"."
 
 (use-package ibuffer-vc
   :ensure t
+  :demand t
   :after ibuffer)
 
 
@@ -721,6 +729,7 @@ ignore stuff starting with \"http\" or \"https\"."
 (use-package diff-hl
   :ensure t
   :defer t
+
   :hook ((conf-mode
           protobuf-mode
           ssh-config-mode
@@ -729,12 +738,14 @@ ignore stuff starting with \"http\" or \"https\"."
          . diff-hl-mode)
   (magit-pre-refresh . diff-hl-magit-pre-refresh)
   (magit-post-refresh . diff-hl-magit-post-refresh)
+
   :custom
   (diff-hl-draw-borders nil))
 
 
 (use-package tramp-sh
   :defer t
+
   :init
   ;; https://www.gnu.org/software/emacs/manual/html_node/tramp/Frequently-Asked-Questions.html
   (setq
@@ -788,6 +799,7 @@ this is effective with some expand functions, eg.,
 
 (use-package dired
   :defer t
+
   :preface
   (defun dired-find-directory (dir)
     (interactive "DFind directory: ")
@@ -880,7 +892,6 @@ this is effective with some expand functions, eg.,
 
 
 (use-package eglot
-  :ensure t
   :defer t
   :custom
   (eglot-autoshutdown t)
@@ -947,8 +958,7 @@ this is effective with some expand functions, eg.,
 
 (use-package vertico
   :ensure t
-  :init
-  (vertico-mode)
+  :demand t
 
   :hook
   (minibuffer-setup
@@ -968,11 +978,13 @@ this is effective with some expand functions, eg.,
      (consult-recent-file (completion-ignore-case . t))))
 
   :config
+  (vertico-mode)
   (vertico-multiform-mode))
 
 
 (use-package consult
   :ensure t
+  :demand t
   :after vertico
 
   ;; Replace bindings. Lazily loaded by `use-package'.
@@ -1090,17 +1102,13 @@ this is effective with some expand functions, eg.,
   :bind (:map minibuffer-local-map
               ("M-A" . marginalia-cycle))
 
-  ;; The :init section is always executed.
-  :init
-
-  ;; Marginalia must be activated in the :init section of use-package such that
-  ;; the mode gets enabled right away. Note that this forces loading the
-  ;; package.
+  :config
   (marginalia-mode))
 
 
 (use-package embark
   :ensure t
+  :defer t
   :after vertico
 
   :bind
@@ -1129,11 +1137,13 @@ this is effective with some expand functions, eg.,
 
 (use-package embark-consult
   :ensure t ; only need to install it, embark loads it after consult if found
+  :defer t
   :after (embark consult))
 
 
 (use-package corfu
   :ensure t
+  :demand t
   :custom
   (corfu-auto nil)
   (corfu-min-width 80)
@@ -1142,11 +1152,12 @@ this is effective with some expand functions, eg.,
   (corfu-scroll-margin 4)
   (corfu-cycle nil)                ;; Enable cycling for `corfu-next/previous'
 
-  :init
+  :config
   (global-corfu-mode))
 
 
 (use-package corfu-popupinfo
+  :defer t
   :after corfu
   :hook (corfu-mode . corfu-popupinfo-mode)
   :bind (:map corfu-map
@@ -1162,6 +1173,7 @@ this is effective with some expand functions, eg.,
 
 (use-package cape
   :ensure t
+  :demand t
   :after corfu
   ;; Bind prefix keymap providing all Cape commands under a mnemonic key.
   ;; Press C-c p ? to for help.
@@ -1293,8 +1305,8 @@ this is effective with some expand functions, eg.,
 
 
 (use-package terminal-here
-  :ensure t
   :if window-system
+  :ensure t
   :defer t
   :custom
   (terminal-here-mac-terminal-command 'iterm2))
@@ -1330,6 +1342,7 @@ this is effective with some expand functions, eg.,
 (use-package org
   :ensure t
   :defer t
+
   :bind (("C-c a" . org-agenda)
          ("C-c c" . org-capture)
          ("C-c l" . org-store-link))
@@ -1492,8 +1505,8 @@ If no ID exists, this does nothing."
 ;; according to the outline structure of the document. It is bundled
 ;; with `org'; no separate :ensure needed.
 (use-package org-indent
-  :defer t
   :after org
+  :defer t
   :diminish org-indent-mode)
 
 
@@ -1502,6 +1515,7 @@ If no ID exists, this does nothing."
 (use-package org-make-toc
   :ensure t
   :after org
+  :defer t
   :hook (org-mode . org-make-toc-mode))
 
 
@@ -1509,7 +1523,8 @@ If no ID exists, this does nothing."
 ;; Markdown.
 (use-package ox-gfm
   :ensure t
-  :after org)
+  :after org
+  :defer t)
 
 
 ;; `org-modern' is a minor mode that provides modern visual
@@ -1526,6 +1541,7 @@ If no ID exists, this does nothing."
 (use-package ob-mermaid
   :ensure t
   :after org
+  :defer t
   :config
   ;; Enable execution of Mermaid code blocks in org files
   (org-babel-enable-languages '(mermaid . t)))
@@ -1729,8 +1745,8 @@ If no ID exists, this does nothing."
 ;; This is needed for `org-mode' to fontify code blocks.
 (use-package htmlize
   :ensure t
-  :defer t
-  :after org)
+  :after org
+  :defer t)
 
 
 (use-package markdown-mode
@@ -1983,8 +1999,8 @@ no region is activated, this will operate on the entire buffer."
 
 
 (use-package sh-script
-  :mode ("\\.zsh_custom\\'" . sh-mode)
   :defer t
+  :mode ("\\.zsh_custom\\'" . sh-mode)
   :custom
   (sh-basic-offset 2))
 
@@ -2046,7 +2062,6 @@ no region is activated, this will operate on the entire buffer."
 
 
 (use-package ruby-mode
-  :disabled
   :defer t
   :interpreter "ruby")
 
@@ -2090,7 +2105,8 @@ no region is activated, this will operate on the entire buffer."
 
 (use-package go-rename
   :ensure t
-  :after go-mode)
+  :after go-mode
+  :defer t)
 
 
 (use-package rust-mode
@@ -2213,6 +2229,7 @@ no region is activated, this will operate on the entire buffer."
 
 (use-package color-theme-sanityinc-tomorrow
   :ensure t
+  :demand t
   :config
   (load-theme 'sanityinc-tomorrow-night t)
   ;; (set-face-attribute 'font-lock-comment-delimiter-face nil :slant 'normal)
