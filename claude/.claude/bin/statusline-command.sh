@@ -13,7 +13,7 @@ eval $(jq -r '
   "MODEL=" + (.model.display_name | @sh),
   "DIR=" + (.workspace.current_dir | @sh),
   "COST=" + (.cost.total_cost_usd // 0 | tostring),
-  "PCT=" + ((.context_window.used_percentage // 0) | floor | tostring),
+  "PCT=" + ((.context_window.used_percentage // 0) | ceil | tostring),
   "DURATION_MS=" + (.cost.total_duration_ms // 0 | tostring),
   "USED_TOKENS=" + (((.context_window.current_usage.input_tokens // 0) + (.context_window.current_usage.output_tokens // 0)) | tostring),
   "CTX_SIZE=" + ((.context_window.context_window_size // 0) | tostring)
