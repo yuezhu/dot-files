@@ -58,6 +58,18 @@ Usage:
 ;; (trace-feature-load 'reformatter)
 
 
+
+(defun fit-window-half-frame (min-height window)
+  "Fit WINDOW to its buffer, capped at half frame height.
+MIN-HEIGHT is the minimum height of the window, in lines.  This is
+intended for use in `display-buffer-alist' to display certain buffers
+in a window that is half the frame height, but not smaller than
+MIN-HEIGHT."
+  (fit-window-to-buffer window
+                        (/ (frame-height) 2)
+                        min-height))
+
+
 ;;
 ;; Initialize ELPA
 ;;
@@ -137,7 +149,7 @@ Usage:
   (ns-command-modifier 'meta)
 
   ;; src/frame.c
-  (menu-bar-mode (equal system-type 'darwin))
+  (menu-bar-mode (eq system-type 'darwin))
   (tool-bar-mode nil)
 
   ;; src/xdisp.c
@@ -163,7 +175,7 @@ Usage:
   ;; src/minibuffer.c
   (context-menu-mode t)
   (enable-recursive-minibuffers t)
-  (hisqtory-delete-duplicates t)
+  (history-delete-duplicates t)
   (minibuffer-prompt-properties
    '(read-only t cursor-intangible t face minibuffer-prompt))
 
@@ -386,7 +398,10 @@ Usage:
 (use-package xref
   :defer t
   :custom
-  (xref-prompt-for-identifier nil))
+  (xref-prompt-for-identifier nil)
+  (xref-search-program 'ripgrep)
+  (xref-ripgrep-extra-arguments '("--follow")) ;; follow symlinks
+  )
 
 
 (use-package autorevert
@@ -522,8 +537,7 @@ Usage:
   (add-to-list 'display-buffer-alist
                '("\\`\\*Calendar\\*\\'"
                  (display-buffer-at-bottom)
-                 (inhibit-same-window . t)
-                 (window-height . 0.5))))
+                 (inhibit-same-window . t))))
 
 
 (use-package recentf
@@ -855,16 +869,16 @@ this is effective with some expand functions, eg.,
   :custom
   (insert-directory-program
    (cond
-    ((and (equal system-type 'darwin)
+    ((and (eq system-type 'darwin)
           (executable-find "gls"))
      "gls")
-    ((equal system-type 'darwin)
+    ((eq system-type 'darwin)
      "ls")))
   (dired-listing-switches
    (cond
-    ((equal system-type 'gnu/linux)
+    ((eq system-type 'gnu/linux)
      "-Ahl --group-directories-first")
-    ((equal system-type 'darwin)
+    ((eq system-type 'darwin)
      (if (string-suffix-p "gls" insert-directory-program)
          "-Alh --group-directories-first"
        "-Ahl"))))
@@ -1042,7 +1056,14 @@ this is effective with some expand functions, eg.,
          ;; Minibuffer history
          :map minibuffer-local-map
          ("M-s" . consult-history)                 ;; orig. next-matching-history-element
-         ("M-r" . consult-history))                ;; orig. previous-matching-history-element
+         ("M-r" . consult-history)                 ;; orig. previous-matching-history-element
+         ;; Project search
+         :map project-prefix-map
+         ("g" . consult-ripgrep)                   ;; orig. project-find-regexp
+         ("G" . consult-git-grep)                  ;; orig. project-find-regexp
+         ("f" . consult-find)                      ;; orig. project-find-file
+         ("F" . consult-fd)                        ;; orig. project-find-file
+         )
 
   ;; The :init configuration is always executed (Not lazy)
   :init
@@ -1064,6 +1085,10 @@ this is effective with some expand functions, eg.,
 
   ;; Explicitly require `recentf' in order to use `consult-recent-file'.
   (require 'recentf)
+
+  ;; Follow symlinks in `consult-ripgrep'
+  (setq consult-ripgrep-args (concat consult-ripgrep-args
+                                     " --follow"))
 
   ;; Optionally configure preview. The default value
   ;; is 'any, such that any key triggers the preview.
@@ -1094,6 +1119,7 @@ this is effective with some expand functions, eg.,
 ;; Enable rich annotations using the Marginalia package
 (use-package marginalia
   :ensure t
+  :defer t
   :after vertico
 
   ;; Bind `marginalia-cycle' locally in the minibuffer.  To make the binding
@@ -1862,16 +1888,11 @@ This only affects the current markdown buffer, and does not add the
   :functions reformatter-define
   :config
   (add-to-list 'display-buffer-alist
-               '("\\`\\*.*-format errors\\*\\'"
+               `("\\`\\*.*-format errors\\*\\'"
                  (display-buffer-at-bottom)
                  (inhibit-same-window . t)
-                 (window-height lambda
-                                (w)
-                                (fit-window-to-buffer w
-                                                      (/
-                                                       (frame-height)
-                                                       2)
-                                                      10))))
+                 (window-height . ,(apply-partially
+                                    #'fit-window-half-frame 10))))
 
   (reformatter-define clang-format
     :program "clang-format"
@@ -1978,14 +1999,17 @@ no region is activated, this will operate on the entire buffer."
        (add-hook 'after-save-hook #'check-parens nil t)))
 
   :preface
-  (defun describe-symbol-at-point ()
-    "Describe the symbol at point."
+  (defun describe-symbol-or-quit-help ()
+    "Describe the symbol at point.
+If no symbol at point, quit the *Help* window if visible."
     (interactive)
-    (describe-symbol (or (symbol-at-point)
-                         (user-error "No symbol at point"))))
+    (if-let ((sym (symbol-at-point)))
+        (describe-symbol sym)
+      (when-let ((win (get-buffer-window "*Help*")))
+        (quit-window nil win))))
 
   :bind (:map emacs-lisp-mode-map
-              ("C-q" . describe-symbol-at-point))
+              ("C-q" . describe-symbol-or-quit-help))
 
   :custom
   (emacs-lisp-docstring-fill-column fill-column))
@@ -2091,16 +2115,11 @@ no region is activated, this will operate on the entire buffer."
   (gofmt-command "goimports")
   :config
   (add-to-list 'display-buffer-alist
-               '("\\`\\*\\(Gofmt Errors\\|go-rename\\)\\*\\'"
+               `("\\`\\*\\(Gofmt Errors\\|go-rename\\)\\*\\'"
                  (display-buffer-at-bottom)
                  (inhibit-same-window . t)
-                 (window-height lambda
-                                (w)
-                                (fit-window-to-buffer w
-                                                      (/
-                                                       (frame-height)
-                                                       2)
-                                                      10)))))
+                 (window-height . ,(apply-partially
+                                    #'fit-window-half-frame 10)))))
 
 
 (use-package go-rename
@@ -2245,11 +2264,11 @@ no region is activated, this will operate on the entire buffer."
             #'(lambda ()
                 ;; Set frame font
                 (cond
-                 ((equal system-type 'gnu/linux)
+                 ((eq system-type 'gnu/linux)
                   (set-face-attribute
                    'default nil :font
                    "-*-Hack-regular-normal-normal-*-16-*-*-*-*-0-iso10646-1"))
-                 ((equal system-type 'darwin)
+                 ((eq system-type 'darwin)
                   (set-face-attribute
                    'default nil :font
                    "-*-Menlo-regular-normal-normal-*-14-*-*-*-*-0-iso10646-1")))
