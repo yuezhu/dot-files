@@ -2231,7 +2231,7 @@ no region is activated, this will operate on the entire buffer."
   :ensure t
   :demand t
   :config
-  (load-theme 'sanityinc-tomorrow-night t)
+  (load-theme 'sanityinc-tomorrow-bright t)
   ;; (set-face-attribute 'font-lock-comment-delimiter-face nil :slant 'normal)
   ;; (set-face-attribute 'font-lock-comment-face nil :slant 'normal)
   ;; (unless (display-graphic-p)
