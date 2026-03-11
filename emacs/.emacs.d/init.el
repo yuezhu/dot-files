@@ -1037,7 +1037,7 @@ this is effective with some expand functions, eg.,
          ("M-g i" . consult-imenu)
          ("M-g I" . consult-imenu-multi)
          ;; M-s bindings in `search-map'
-         ("M-s d" . consult-find)                  ;; Alternative: consult-fd
+         ("M-s d" . consult-fd)                    ;; Alternative: consult-find
          ("M-s c" . consult-locate)
          ("M-s g" . consult-grep)
          ("M-s G" . consult-git-grep)
@@ -1061,8 +1061,8 @@ this is effective with some expand functions, eg.,
          :map project-prefix-map
          ("g" . consult-ripgrep)                   ;; orig. project-find-regexp
          ("G" . consult-git-grep)                  ;; orig. project-find-regexp
-         ("f" . consult-find)                      ;; orig. project-find-file
-         ("F" . consult-fd)                        ;; orig. project-find-file
+         ;; ("f" . consult-find)                      ;; orig. project-find-file
+         ("f" . consult-fd)                        ;; orig. project-find-file
          )
 
   ;; The :init configuration is always executed (Not lazy)
@@ -1078,6 +1078,19 @@ this is effective with some expand functions, eg.,
   ;; Use Consult to select xref locations with preview
   (setq xref-show-xrefs-function #'consult-xref
         xref-show-definitions-function #'consult-xref)
+
+  ;; When you run `project-switch-project', Emacs reads
+  ;; `project-switch-commands' to build the interactive menu that asks
+  ;; "which command do you want to run in the new project?". It's
+  ;; essentially a separate registry that has no connection to
+  ;; `project-prefix-map'.
+  (setq project-switch-commands
+        '((consult-find "Find file" ?f)
+          (consult-ripgrep "Ripgrep" ?g)
+          (consult-git-grep "Git grep" ?G)
+          (project-dired "Dired" ?d)
+          (project-vc-dir "VC-Dir" ?v)
+          (project-shell "Shell" ?s)))
 
   ;; Configure other variables and modes in the :config section,
   ;; after lazily loading the package.
@@ -2279,16 +2292,6 @@ If no symbol at point, quit the *Help* window if visible."
 ;;
 ;; Configure additional keybindings
 ;;
-(defun close-help-or-keyboard-quit ()
-  "Close *Help* window if visible, otherwise `keyboard-quit'."
-  (interactive)
-  (if-let ((win (get-buffer-window "*Help*")))
-      (quit-window nil win)
-    (keyboard-quit)))
-
-;; `C-g' is `keyboard-quit' by default, but I want it to close the
-;; *Help* window if it's visible.
-(bind-key "C-g" #'close-help-or-keyboard-quit)
 ;; `C-x k' is `kill-buffer' by default.
 (bind-key "C-x k" #'kill-current-buffer)
 ;; `C-z' is `suspend-frame' by default, but I don't use it and might
