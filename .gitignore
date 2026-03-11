@@ -2,7 +2,6 @@
 !/emacs/.emacs.d/early-init.el
 !/emacs/.emacs.d/init.el
 !/emacs/.emacs.d/lisp
-!/emacs/.emacs.d/transient
 
 /mpv/.config/mpv/*
 !/mpv/.config/mpv/input.conf
