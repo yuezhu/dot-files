@@ -2,17 +2,19 @@
 
 # Claude Code statusline renderer.
 #
-# Reads the Claude Code status JSON from stdin and renders a two-line
-# summary for use in a terminal statusline (e.g. tmux status-right).
+# Reads Claude Code status JSON from stdin (produced by `claude status`)
+# and prints two ANSI-colored lines suitable for embedding in a terminal
+# statusline (e.g. tmux status-right).
 #
-# Line 1: model name, version, working directory, git branch
-# Line 2: context window bar, session cost, elapsed time
+#   Line 1: model · version · project dir · git branch
+#   Line 2: context-window usage bar · session cost · elapsed time
 #
-# Example output:
-#   Opus 4.6 (1M context) (v1.0.20) | 📁 my-project | 🌿 main
+# Example:
+#   Opus 4.6 (v1.0.20) | 📁 my-project | 🌿 main
 #   ███░░░░░░░ 30% | 💰 $1.23 | ⏱️ 4m 12s
 
-# --- Extract fields from JSON -----------------------------------------------
+# --- Parse status JSON --------------------------------------------------------
+# Emit shell assignments from the JSON so `eval` sets our variables in one pass.
 
 eval "$(jq -r '
   "MODEL=" + (.model.display_name | @sh),
@@ -25,16 +27,16 @@ eval "$(jq -r '
   "CTX_SIZE=" + ((.context_window.context_window_size // 0) | tostring)
 ')"
 
-# --- Compute context window percentage --------------------------------------
+# --- Context-window percentage ------------------------------------------------
+# Recompute from raw token counts when available; the pre-computed
+# used_percentage can lag behind or lose precision from rounding.
 
-# Prefer raw token counts over the pre-computed used_percentage, since
-# the latter may be stale or rounded.  Cap at 100%.
 if [ "$CTX_SIZE" -gt 0 ] && [ "$USED_TOKENS" -gt 0 ]; then
   PCT=$((USED_TOKENS * 100 / CTX_SIZE))
   [ "$PCT" -gt 100 ] && PCT=100
 fi
 
-# --- ANSI colors -------------------------------------------------------------
+# --- ANSI colors --------------------------------------------------------------
 
 ESC=$(printf '\033')
 CYAN="${ESC}[36m"
@@ -43,12 +45,11 @@ YELLOW="${ESC}[33m"
 RED="${ESC}[31m"
 RESET="${ESC}[0m"
 
-# --- Helpers -----------------------------------------------------------------
+# --- Helpers ------------------------------------------------------------------
 
 # pct_bar <percentage>
-#   Render a 10-segment progress bar colored by severity:
-#     green (<70%)  yellow (70-89%)  red (>=90%)
-#   Example: "███░░░░░░░ 27%"
+#   Print a 10-segment bar (█/░) colored by threshold:
+#     green (< 70%)  ·  yellow (70–89%)  ·  red (≥ 90%)
 pct_bar() {
   _pct=$1
   if [ "$_pct" -ge 90 ]; then _color="$RED"
@@ -70,18 +71,28 @@ pct_bar() {
   printf '%s' "${_color}${_bar}${RESET} ${_pct}%"
 }
 
-# --- Render ------------------------------------------------------------------
+# human_duration <milliseconds>
+#   Print elapsed time using the most natural unit pair:
+#     < 1 min → "5s"  ·  < 1 hr → "4m 12s"  ·  ≥ 1 hr → "1h 23m"
+human_duration() {
+  _total_secs=$(($1 / 1000))
+  if [ "$_total_secs" -lt 60 ]; then
+    printf '%ds' "$_total_secs"
+  elif [ "$_total_secs" -lt 3600 ]; then
+    printf '%dm %ds' "$((_total_secs / 60))" "$((_total_secs % 60))"
+  else
+    printf '%dh %dm' "$((_total_secs / 3600))" "$((_total_secs % 3600 / 60))"
+  fi
+}
 
-MINS=$((DURATION_MS / 60000))
-SECS=$(((DURATION_MS % 60000) / 1000))
+# --- Render -------------------------------------------------------------------
 
 BRANCH=$(git branch --show-current 2>/dev/null)
-if [ -n "$BRANCH" ]; then
-  BRANCH=" | 🌿 $BRANCH"
-else
-  BRANCH=""
-fi
+[ -n "$BRANCH" ] && BRANCH=" | 🌿 $BRANCH"
 
 COST_FMT=$(printf '$%.2f' "$COST")
+
+# Line 1: identity & location
 printf '%s\n' "${CYAN}${MODEL}${RESET} (v${VERSION}) | 📁 ${DIR##*/}$BRANCH"
-printf '%s\n' "$(pct_bar "$PCT") | 💰 ${YELLOW}${COST_FMT}${RESET} | ⏱️ ${MINS}m ${SECS}s"
+# Line 2: resource gauges
+printf '%s\n' "$(pct_bar "$PCT") | 💰 ${YELLOW}${COST_FMT}${RESET} | ⏱️ $(human_duration "$DURATION_MS")"
