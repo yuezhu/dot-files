@@ -55,7 +55,7 @@ Usage:
                 `((name . ,(intern (format "debug-%s-load" name)))))))
 
 
-;; (trace-feature-load 'reformatter)
+;; (trace-feature-load 'project)
 
 
 
@@ -811,6 +811,12 @@ this is effective with some expand functions, eg.,
                   (apply func args)))))
 
 
+(use-package project
+  :defer t
+  :custom
+  (project-switch-commands 'project-dired))
+
+
 (use-package dired
   :defer t
 
@@ -1078,19 +1084,6 @@ this is effective with some expand functions, eg.,
   ;; Use Consult to select xref locations with preview
   (setq xref-show-xrefs-function #'consult-xref
         xref-show-definitions-function #'consult-xref)
-
-  ;; When you run `project-switch-project', Emacs reads
-  ;; `project-switch-commands' to build the interactive menu that asks
-  ;; "which command do you want to run in the new project?". It's
-  ;; essentially a separate registry that has no connection to
-  ;; `project-prefix-map'.
-  (setq project-switch-commands
-        '((consult-find "Find file" ?f)
-          (consult-ripgrep "Ripgrep" ?g)
-          (consult-git-grep "Git grep" ?G)
-          (project-dired "Dired" ?d)
-          (project-vc-dir "VC-Dir" ?v)
-          (project-shell "Shell" ?s)))
 
   ;; Configure other variables and modes in the :config section,
   ;; after lazily loading the package.
