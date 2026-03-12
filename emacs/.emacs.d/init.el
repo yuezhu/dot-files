@@ -1904,6 +1904,9 @@ This only affects the current markdown buffer, and does not add the
   (reformatter-define clang-format
     :program "clang-format"
     :args (list "--assume-filename" (buffer-file-name)))
+  (reformatter-define google-java-format
+    :program "google-java-format"
+    :args '("--skip-reflowing-long-strings" "--aosp" "-"))
   (reformatter-define json-format
     :program "jq"
     :args '("." "--monochrome-output" "--indent" "2"))
@@ -1921,9 +1924,15 @@ This only affects the current markdown buffer, and does not add the
     :args '("fmt" "-no-color" "-"))
 
   :hook
-  (c-mode-common
+  (c-mode
    . (lambda ()
-       (bind-key "<f12>" #'clang-format-buffer c-mode-base-map)))
+       (bind-key "<f12>" #'clang-format-buffer c-mode-map)))
+  (c++-mode
+   . (lambda ()
+       (bind-key "<f12>" #'clang-format-buffer c++-mode-map)))
+  (java-mode
+   . (lambda ()
+       (bind-key "<f12>" #'google-java-format-buffer java-mode-map)))
   (json-mode
    . (lambda ()
        (bind-key "<f12>" #'json-format-buffer json-mode-map)))
