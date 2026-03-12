@@ -9,7 +9,7 @@
 #   DURATION_MS=95000
 #   USED_TOKENS=52198
 #   CTX_SIZE=1000000
-eval $(jq -r '
+eval "$(jq -r '
   "MODEL=" + (.model.display_name | @sh),
   "DIR=" + (.workspace.current_dir | @sh),
   "COST=" + (.cost.total_cost_usd // 0 | tostring),
@@ -17,7 +17,7 @@ eval $(jq -r '
   "DURATION_MS=" + (.cost.total_duration_ms // 0 | tostring),
   "USED_TOKENS=" + (((.context_window.total_input_tokens // 0) + (.context_window.total_output_tokens // 0)) | tostring),
   "CTX_SIZE=" + ((.context_window.context_window_size // 0) | tostring)
-')
+')"
 
 # PCT = context window usage as a percentage (0-100). When
 # current_usage data is available we compute it from raw tokens (sum
