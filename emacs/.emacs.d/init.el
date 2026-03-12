@@ -660,7 +660,8 @@ ignore stuff starting with \"http\" or \"https\"."
 
 
 (use-package flymake
-  :defer t)
+  :defer t
+  :hook (sh-mode . flymake-mode))
 
 
 (use-package flycheck
