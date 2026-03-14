@@ -1185,6 +1185,10 @@ this is effective with some expand functions, eg.,
   (corfu-scroll-margin 4)
   (corfu-cycle nil)                ;; Enable cycling for `corfu-next/previous'
 
+  :bind
+  ;; Configure SPC for separator insertion
+  (:map corfu-map ("SPC" . corfu-insert-separator))
+
   :config
   (global-corfu-mode))
 
@@ -2247,14 +2251,20 @@ If no symbol at point, quit the *Help* window if visible."
 
 
 (use-package zenburn-theme
-  :disabled
   :ensure t
+  :demand t
   :init
   (unless (display-graphic-p)
     (setq zenburn-override-colors-alist
           '(("zenburn-bg" . "unspecified-bg")
             ("zenburn-fg" . "unspecified-fg"))))
+
   :config
+  ;; scale headings in org-mode
+  (setq zenburn-scale-org-headlines t)
+  ;; scale headings in outline-mode
+  (setq zenburn-scale-outline-headlines t)
+
   (load-theme 'zenburn t)
   ;; (zenburn-with-color-variables
   ;;  (custom-set-faces
@@ -2263,6 +2273,7 @@ If no symbol at point, quit the *Help* window if visible."
 
 
 (use-package color-theme-sanityinc-tomorrow
+  :disabled
   :ensure t
   :demand t
   :config
