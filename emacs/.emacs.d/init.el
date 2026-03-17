@@ -2251,6 +2251,7 @@ If no symbol at point, quit the *Help* window if visible."
 
 
 (use-package zenburn-theme
+  :disabled
   :ensure t
   :demand t
   :init
@@ -2273,7 +2274,6 @@ If no symbol at point, quit the *Help* window if visible."
 
 
 (use-package color-theme-sanityinc-tomorrow
-  :disabled
   :ensure t
   :demand t
   :config
