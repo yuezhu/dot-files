@@ -14,9 +14,12 @@
 #   ███░░░░░░░ 30% | 💰 $1.23 | ⏱️ 4m 12s
 
 # --- Parse status JSON --------------------------------------------------------
-# Emit shell assignments from the JSON so `eval` sets our variables in one pass.
+# Capture stdin first, then emit shell assignments from the JSON so `eval`
+# sets our variables in one pass.
 
-eval "$(jq -r '
+input=$(cat)
+
+eval "$(echo "$input" | jq -r '
   "MODEL=" + (.model.display_name | @sh),
   "VERSION=" + (.version // "" | @sh),
   "DIR=" + (.workspace.current_dir | @sh),

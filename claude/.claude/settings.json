@@ -15,6 +15,16 @@
           }
         ]
       }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh ~/.claude/bin/notify-bell.sh"
+          }
+        ]
+      }
     ]
   },
   "statusLine": {
