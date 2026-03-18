@@ -10,4 +10,5 @@
 
 /claude/.claude/*
 !/claude/.claude/settings.json
-!/claude/.claude/bin
+!/claude/.claude/statusline.sh
+!/claude/.claude/hooks

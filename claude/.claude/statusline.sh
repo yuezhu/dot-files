@@ -17,9 +17,9 @@
 # Capture stdin first, then emit shell assignments from the JSON so `eval`
 # sets our variables in one pass.
 
-input=$(cat)
+INPUT=$(cat)
 
-eval "$(echo "$input" | jq -r '
+eval "$(echo "$INPUT" | jq -r '
   "MODEL=" + (.model.display_name | @sh),
   "VERSION=" + (.version // "" | @sh),
   "DIR=" + (.workspace.current_dir | @sh),
