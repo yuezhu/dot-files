@@ -9,6 +9,6 @@
 !/mpv/.config/mpv/scripts
 
 /claude/.claude/*
-!/claude/.claude/settings.json
+!/claude/.claude/sync-hooks.sh
 !/claude/.claude/statusline.sh
 !/claude/.claude/hooks
