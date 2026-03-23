@@ -282,6 +282,42 @@ MIN-HEIGHT."
   (mouse-wheel-progressive-speed nil))
 
 
+;; Enable mouse support in terminal Emacs via xterm mouse reporting.
+(use-package xt-mouse
+  :unless (display-graphic-p)
+  :demand t
+  :custom
+  (xterm-mouse-mode 1))
+
+;; Configure xterm terminal features for terminal Emacs.
+;; - 'setSelection': enable OSC 52 clipboard (base64-encoded kill/copy
+;; text sent as "\e]52;c;<base64>\a" to the terminal emulator).
+;; - 'modifyOtherKeys': improved modifier key encoding.
+(use-package term/xterm
+  :unless (display-graphic-p)
+  :demand t
+  :custom
+  (xterm-set-window-title nil)
+  (xterm-extra-capabilities '(setSelection modifyOtherKeys)))
+
+;; Enable OSC 52 clipboard integration inside tmux.
+;;
+;; When TERM is "tmux-256color", Emacs runs 'terminal-init-tmux'
+;; (term/tmux.el), which binds 'xterm-extra-capabilities' to the value
+;; of 'xterm-tmux-extra-capabilities' and delegates to xterm init.
+;; Adding 'setSelection' here enables the built-in
+;; 'gui-backend-set-selection' method (term/xterm.el), which encodes
+;; killed/copied text as base64 and sends it via the OSC 52 escape
+;; sequence ("\e]52;c;<base64>\a"). tmux ('set-clipboard on')
+;; intercepts this and forwards it to the system clipboard.
+(use-package term/tmux
+  :if (and (not (display-graphic-p))
+           (getenv "TMUX"))
+  :demand t
+  :custom
+  (xterm-tmux-extra-capabilities '(setSelection modifyOtherKeys)))
+
+
 (use-package warnings
   :defer t
   :custom
