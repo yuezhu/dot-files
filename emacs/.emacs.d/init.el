@@ -1573,20 +1573,22 @@ If no ID exists, this does nothing."
   ;; Enable execution of PlantUML code blocks in org files
   (org-babel-enable-languages '(plantuml . t))
 
+  ;; FIXME: this doesn't work well when using Emacs in terminal.
   ;; Disable custom themes during Org HTML export to prevent them from
   ;; interfering with the exported document's styles.
-  (defun org-export-as-without-theme (func backend &rest args)
-    "Temporarily disable custom themes during Org HTML export."
-    (if (eq backend 'html)
-        (let ((themes custom-enabled-themes)
-              (inhibit-redisplay t))
-          (mapc #'disable-theme themes)
-          (unwind-protect
-              (apply func backend args)
-            (mapc #'enable-theme (reverse themes))))
-      (apply func backend args)))
+  ;; (defun org-export-as-without-theme (func backend &rest args)
+  ;;   "Temporarily disable custom themes during Org HTML export."
+  ;;   (if (eq backend 'html)
+  ;;       (let ((themes custom-enabled-themes)
+  ;;             (inhibit-redisplay t))
+  ;;         (mapc #'disable-theme themes)
+  ;;         (unwind-protect
+  ;;             (apply func backend args)
+  ;;           (mapc #'enable-theme (reverse themes))))
+  ;;     (apply func backend args)))
 
-  (advice-add 'org-export-as :around #'org-export-as-without-theme))
+  ;; (advice-add 'org-export-as :around #'org-export-as-without-theme)
+  )
 
 
 ;; `org-indent-mode' is a minor mode that visually indents text
