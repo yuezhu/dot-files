@@ -55,6 +55,8 @@ do
   if [[ -d "${dir}" ]]; then
     export ZSH_HIGHLIGHT_HIGHLIGHTERS_DIR="${dir}/highlighters"
     source "${dir}/zsh-syntax-highlighting.zsh"
+    # Set comment color to gray
+    export ZSH_HIGHLIGHT_STYLES[comment]='fg=245'
     break
   fi
 done
