@@ -1,8 +1,9 @@
 theme = Tomorrow Night Bright
 
-# font-thicken = true
+font-thicken = true
+font-thicken-strength = 0
 font-family = Menlo
-font-size = 14
+font-size = 14.5
 
 cursor-style = block
 cursor-style-blink = false
