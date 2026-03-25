@@ -78,7 +78,7 @@ MIN-HEIGHT."
 ;; Some packages are built into Emacs, but I want to use the ELPA
 ;; versions.
 (defconst package-must-use-elpa-packages
-  '()
+  '(modus-themes org)
   "A list of packages that must use the ELPA versions.")
 
 (advice-add 'package-installed-p :around
@@ -180,6 +180,7 @@ MIN-HEIGHT."
    '(read-only t cursor-intangible t face minibuffer-prompt))
 
   ;; src/buffer.c
+  (fill-column 80)
   (tab-width 4)
 
   ;; src/frame.c
@@ -289,33 +290,49 @@ MIN-HEIGHT."
   :custom
   (xterm-mouse-mode 1))
 
+
 ;; Configure xterm terminal features for terminal Emacs.
-;; - 'setSelection': enable OSC 52 clipboard (base64-encoded kill/copy
-;; text sent as "\e]52;c;<base64>\a" to the terminal emulator).
-;; - 'modifyOtherKeys': improved modifier key encoding.
 (use-package term/xterm
   :unless (display-graphic-p)
   :demand t
   :custom
+  ;; Don't let Emacs set the terminal window title.
   (xterm-set-window-title nil)
+  ;; - setSelection: OSC 52 clipboard (copy in Emacs -> system clipboard)
+  ;; - modifyOtherKeys: improved modifier key encoding
   (xterm-extra-capabilities '(setSelection modifyOtherKeys)))
 
-;; Enable OSC 52 clipboard integration inside tmux.
-;;
-;; When TERM is "tmux-256color", Emacs runs 'terminal-init-tmux'
-;; (term/tmux.el), which binds 'xterm-extra-capabilities' to the value
-;; of 'xterm-tmux-extra-capabilities' and delegates to xterm init.
-;; Adding 'setSelection' here enables the built-in
-;; 'gui-backend-set-selection' method (term/xterm.el), which encodes
-;; killed/copied text as base64 and sends it via the OSC 52 escape
-;; sequence ("\e]52;c;<base64>\a"). tmux ('set-clipboard on')
-;; intercepts this and forwards it to the system clipboard.
+
+;; Inside tmux, term/tmux.el delegates to xterm init but uses its own
+;; capabilities variable.  Enable the same features there.
 (use-package term/tmux
   :if (and (not (display-graphic-p))
            (getenv "TMUX"))
   :demand t
   :custom
+  ;; - setSelection: OSC 52 clipboard - tmux (set-clipboard on)
+  ;;   intercepts and forwards to the outer terminal's clipboard
+  ;; - modifyOtherKeys: improved modifier key encoding
   (xterm-tmux-extra-capabilities '(setSelection modifyOtherKeys)))
+
+
+;; Terminal Emacs: set interprogram-paste-function so C-y can paste
+;; text copied outside Emacs.  Returns nil when unavailable, which
+;; makes Emacs fall back to the kill ring.
+(unless (display-graphic-p)
+  (setq interprogram-paste-function
+        (cond
+         ;; Inside tmux: read from the tmux paste buffer.
+         ((getenv "TMUX")
+          (lambda ()
+            (let ((text (shell-command-to-string "tmux save-buffer -")))
+              (unless (string-empty-p text) text))))
+         ;; Outside tmux: read from X11 clipboard via xsel.
+         ;; Over SSH without X forwarding, xsel fails and returns "".
+         ((executable-find "xsel")
+          (lambda ()
+            (let ((text (shell-command-to-string "xsel -ob 2>/dev/null")))
+              (unless (string-empty-p text) text)))))))
 
 
 (use-package warnings
@@ -1573,21 +1590,20 @@ If no ID exists, this does nothing."
   ;; Enable execution of PlantUML code blocks in org files
   (org-babel-enable-languages '(plantuml . t))
 
-  ;; FIXME: this doesn't work well when using Emacs in terminal.
-  ;; Disable custom themes during Org HTML export to prevent them from
-  ;; interfering with the exported document's styles.
-  ;; (defun org-export-as-without-theme (func backend &rest args)
-  ;;   "Temporarily disable custom themes during Org HTML export."
-  ;;   (if (eq backend 'html)
-  ;;       (let ((themes custom-enabled-themes)
-  ;;             (inhibit-redisplay t))
-  ;;         (mapc #'disable-theme themes)
-  ;;         (unwind-protect
-  ;;             (apply func backend args)
-  ;;           (mapc #'enable-theme (reverse themes))))
-  ;;     (apply func backend args)))
+  ;; Use modus-operandi (light theme) during Org HTML export so
+  ;; exported code blocks get dark-on-light colors that render
+  ;; correctly on a white page background.
+  (defun org-export-with-light-theme (func backend &rest args)
+    "Temporarily switch to modus-operandi during HTML export."
+    (if (eq backend 'html)
+        (let ((inhibit-redisplay t))
+          (modus-themes-load-theme 'modus-operandi)
+          (unwind-protect
+              (apply func backend args)
+            (modus-themes-load-theme 'modus-vivendi)))
+      (apply func backend args)))
 
-  ;; (advice-add 'org-export-as :around #'org-export-as-without-theme)
+  (advice-add 'org-export-as :around #'org-export-with-light-theme)
   )
 
 
@@ -2328,7 +2344,7 @@ If no symbol at point, quit the *Help* window if visible."
 
 (use-package color-theme-sanityinc-tomorrow
   :ensure t
-  :demand t
+  :disabled t
   :config
   (load-theme 'sanityinc-tomorrow-bright t)
   ;; (set-face-attribute 'font-lock-comment-delimiter-face nil :slant 'normal)
@@ -2339,10 +2355,22 @@ If no symbol at point, quit the *Help* window if visible."
   (custom-safe-themes t))
 
 
+(use-package modus-themes
+  :ensure t
+  :demand t
+  :config
+  (unless (display-graphic-p)
+    (setq modus-themes-common-palette-overrides
+          `((border-mode-line-active unspecified)
+            (border-mode-line-inactive unspecified))))
+  (modus-themes-load-theme 'modus-vivendi)
+  :custom
+  (custom-safe-themes t))
+
+
 (when (display-graphic-p)
   (add-hook 'after-init-hook
             #'(lambda ()
-                ;; Set frame font
                 (cond
                  ((eq system-type 'gnu/linux)
                   (set-face-attribute
@@ -2354,6 +2382,12 @@ If no symbol at point, quit the *Help* window if visible."
                    "-*-Menlo-regular-normal-normal-*-14-*-*-*-*-0-iso10646-1")))
                 (set-frame-parameter nil 'fullscreen 'maximized))
             t))
+
+
+;; Use a heavier box-drawing character for the vertical window border
+;; in terminal Emacs, where faces cannot style the border.
+(unless (display-graphic-p)
+  (set-display-table-slot standard-display-table 'vertical-border ?┃))
 
 
 ;;
