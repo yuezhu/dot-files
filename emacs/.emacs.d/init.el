@@ -721,8 +721,8 @@ ignore stuff starting with \"http\" or \"https\"."
 
 (use-package flyspell-correct
   :ensure t
-  :defer t
   :after flyspell
+  :defer t
   :bind (:map flyspell-mode-map
               ("C-c s w" . flyspell-correct-wrapper)))
 
@@ -799,8 +799,8 @@ ignore stuff starting with \"http\" or \"https\"."
 
 (use-package ibuffer-vc
   :ensure t
-  :demand t
-  :after ibuffer)
+  :after ibuffer
+  :demand t)
 
 
 (use-package hideshow
@@ -1078,8 +1078,8 @@ this is effective with some expand functions, eg.,
 
 (use-package consult
   :ensure t
-  :demand t
   :after vertico
+  :demand t
 
   ;; Replace bindings. Lazily loaded by `use-package'.
   :bind (;; C-c bindings in `mode-specific-map'
@@ -1202,8 +1202,8 @@ this is effective with some expand functions, eg.,
 ;; Enable rich annotations using the Marginalia package
 (use-package marginalia
   :ensure t
-  :defer t
   :after vertico
+  :defer t
 
   ;; Bind `marginalia-cycle' locally in the minibuffer.  To make the binding
   ;; available in the *Completions* buffer, add it to the
@@ -1217,8 +1217,8 @@ this is effective with some expand functions, eg.,
 
 (use-package embark
   :ensure t
-  :defer t
   :after vertico
+  :defer t
 
   :bind
   (("C-." . embark-act)         ;; pick some comfortable binding
@@ -1269,9 +1269,20 @@ this is effective with some expand functions, eg.,
   (global-corfu-mode))
 
 
-(use-package corfu-popupinfo
-  :defer t
+;; TODO: Emacs 31 may not need this.
+(use-package corfu-terminal
+  :ensure t
+  :unless (and (< emacs-major-version 31)
+               (display-graphic-p))
   :after corfu
+  :demand t
+  :config
+  (corfu-terminal-mode))
+
+
+(use-package corfu-popupinfo
+  :after corfu
+  :defer t
   :hook (corfu-mode . corfu-popupinfo-mode)
   :bind (:map corfu-map
               ("M-n" . corfu-popupinfo-scroll-up)
@@ -1286,8 +1297,8 @@ this is effective with some expand functions, eg.,
 
 (use-package cape
   :ensure t
-  :demand t
   :after corfu
+  :demand t
   ;; Bind prefix keymap providing all Cape commands under a mnemonic key.
   ;; Press C-c p ? to for help.
   :bind ("C-c p" . cape-prefix-map) ;; Alternative key: M-<tab>, M-p, M-+
