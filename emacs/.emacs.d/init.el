@@ -434,11 +434,17 @@ MIN-HEIGHT."
 
 (use-package display-fill-column-indicator
   :defer t
-  :hook
-  (auto-fill-mode
-   . (lambda ()
-       (display-fill-column-indicator-mode
-        (if auto-fill-function 1 -1)))))
+  ;; :hook
+  ;; (auto-fill-mode
+  ;;  . (lambda ()
+  ;;      (display-fill-column-indicator-mode
+  ;;       (if auto-fill-function 1 -1))))
+  )
+
+
+(use-package display-line-numbers
+  :defer t
+  :hook diff-mode)
 
 
 (use-package subword
@@ -454,7 +460,16 @@ MIN-HEIGHT."
   (xref-prompt-for-identifier nil)
   (xref-search-program 'ripgrep)
   (xref-ripgrep-extra-arguments '("--follow")) ;; follow symlinks
-  )
+  :config
+  ;; Use ripgrep for `xref-find-references' when no LSP is active.
+  ;; The default method uses semantic-symref (CScope/Global), and dumb-jump
+  ;; has its own method that often fails. Override both with ripgrep search.
+  ;; Eglot's (eql 'eglot) method is more specific and still takes precedence.
+  (defun xref--ripgrep-references (identifier)
+    (xref-matches-in-files (regexp-quote identifier)
+                           (project-files (project-current t))))
+  (cl-defmethod xref-backend-references (_backend identifier)
+    (xref--ripgrep-references identifier)))
 
 
 (use-package autorevert
@@ -849,7 +864,12 @@ ignore stuff starting with \"http\" or \"https\"."
   :init
   (add-hook 'xref-backend-functions #'dumb-jump-xref-activate)
   :custom
-  (dumb-jump-force-searcher 'rg))
+  (dumb-jump-force-searcher 'rg)
+  :config
+  ;; Override dumb-jump's xref-backend-references to use ripgrep via xref.
+  ;; Must be in :config so it runs after dumb-jump defines its own method.
+  (cl-defmethod xref-backend-references ((_backend (eql dumb-jump)) identifier)
+    (xref--ripgrep-references identifier)))
 
 
 (use-package hippie-exp
@@ -1149,6 +1169,9 @@ this is effective with some expand functions, eg.,
   ;; Follow symlinks in `consult-ripgrep'
   (setq consult-ripgrep-args (concat consult-ripgrep-args
                                      " --follow"))
+
+  ;; Pre-fill 'consult-ripgrep' with symbol at point
+  (consult-customize consult-ripgrep :initial (thing-at-point 'symbol))
 
   ;; Optionally configure preview. The default value
   ;; is 'any, such that any key triggers the preview.
@@ -2397,7 +2420,7 @@ If no symbol at point, quit the *Help* window if visible."
 (bind-key "C-x k" #'kill-current-buffer)
 ;; `C-z' is `suspend-frame' by default, but I don't use it and might
 ;; accidentally suspend Emacs.
-(when (display-graphic-p) (unbind-key "C-z"))
+(unbind-key "C-z")
 
 ;; GC was suspended in the early-init.el during startup to speed up
 ;; initialization. Restore GC config and run GC after Emacs startup.
