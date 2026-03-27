@@ -1503,11 +1503,20 @@ If no ID exists, this does nothing."
   :hook
   (org-capture-prepare-finalize . org-copy-current-topmost-heading-id)
 
-  :custom
-  ;; Root directory for all org files
-  (org-directory "~/org")
+  :init
+  (defconst org-home-directory (or (getenv "EMACS_ORG_HOME")
+                                   (getenv "HOME"))
+    "The home directory for all org files.")
+  (defconst org-base-directory (file-name-concat org-home-directory "org")
+    "The base directory for plain org files.")
+  (defconst org-roam-base-directory (file-name-concat org-home-directory "org-roam")
+    "The base directory for org-roam files.")
 
-  (org-agenda-files `(,(file-name-as-directory org-directory)))
+  :custom
+  ;; Base directory for all org files
+  (org-directory org-base-directory)
+
+  (org-agenda-files `(,(file-name-as-directory org-base-directory)))
 
   ;; (org-default-notes-file (concat
   ;;                          (file-name-as-directory org-directory)
@@ -1575,27 +1584,27 @@ If no ID exists, this does nothing."
       :jump-to-captured t)))
 
   (org-publish-project-alist
-   '(("org-file"
-      :base-directory "~/org/"
+   `(("org-file"
+      :base-directory ,org-base-directory
       :base-extension "org"
       :publishing-function org-html-publish-to-html
       :publishing-directory "~/.www/org"
       :recursive t)
      ("org-static"
-      :base-directory "~/org/"
+      :base-directory ,org-base-directory
       :base-extension "png\\|jpg\\|jpeg\\|gif\\|svg\\|css\\|pdf"
       :publishing-function org-publish-attachment
       :publishing-directory "~/.www/org/"
       :recursive t)
      ("org" :components ("org-file" "org-static"))
      ("org-roam-file"
-      :base-directory "~/org-roam/"
+      :base-directory ,org-roam-base-directory
       :base-extension "org"
       :publishing-function org-html-publish-to-html
       :publishing-directory "~/.www/org-roam"
       :recursive t)
      ("org-roam-static"
-      :base-directory "~/org-roam/"
+      :base-directory ,org-roam-base-directory
       :base-extension "png\\|jpg\\|jpeg\\|gif\\|svg\\|css\\|pdf"
       :publishing-function org-publish-attachment
       :publishing-directory "~/.www/org-roam/"
@@ -1693,11 +1702,11 @@ If no ID exists, this does nothing."
   :ensure t
   :defer t
   :custom
-  ;; Root directory that `org-roam' files; all node files live here
-  (org-roam-directory "~/org-roam")
+  ;; Base directory that `org-roam' files; all node files live here
+  (org-roam-directory org-roam-base-directory)
 
   ;; Location of the SQLite database that indexes all nodes and links
-  (org-roam-db-location "~/org-roam/org-roam.db")
+  (org-roam-db-location (file-name-concat user-emacs-directory "org-roam.db"))
 
   ;; Automatically update the database whenever a roam file is saved.
   ;; This keeps backlinks accurate in real time at a small cost to
