@@ -1171,7 +1171,8 @@ this is effective with some expand functions, eg.,
                                      " --follow"))
 
   ;; Pre-fill 'consult-ripgrep' with symbol at point
-  (consult-customize consult-ripgrep :initial (thing-at-point 'symbol))
+  ;; Disabled because my `xref-find-references' already does this.
+  ;; (consult-customize consult-ripgrep :initial (thing-at-point 'symbol))
 
   ;; Optionally configure preview. The default value
   ;; is 'any, such that any key triggers the preview.
@@ -1522,6 +1523,9 @@ If no ID exists, this does nothing."
   ;;                          (file-name-as-directory org-directory)
   ;;                          "notes.org"))
 
+  ;; Enable the `org-tempo' module to use easy templates
+  (org-modules '(org-tempo))
+
   ;; Do not ask for confirmation when evaluating code blocks
   (org-confirm-babel-evaluate nil)
 
@@ -1657,6 +1661,24 @@ If no ID exists, this does nothing."
   :after org
   :defer t
   :diminish org-indent-mode)
+
+
+(use-package org-tempo
+  :after org
+  :defer t
+  :hook
+  (org-mode
+   . (lambda ()
+       "Disable electric pairing of < when beginning a line."
+       (setq-local electric-pair-inhibit-predicate
+                   (lambda (char)
+                     (if (and (eq char ?<)
+                              (featurep 'org-tempo)
+                              (save-excursion
+                                (backward-char)
+                                (looking-back "^\\s-*" (line-beginning-position))))
+                         t
+                       (electric-pair-default-inhibit char)))))))
 
 
 ;; `org-make-toc-mode' is a minor mode that automatically generates a
