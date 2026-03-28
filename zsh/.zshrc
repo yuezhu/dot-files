@@ -2,74 +2,82 @@
 typeset -U path
 typeset -U fpath
 
+## Helpers
+
+# Print the first existing directory from the given candidates
+function _first_dir {
+  local d
+  for d in "$@"; do
+    [[ -d "$d" ]] && { print -r -- "$d"; return; }
+  done
+  return 1
+}
+
+# Print the first executable file from the given candidates
+function _first_exec {
+  local f
+  for f in "$@"; do
+    [[ -x "$f" ]] && { print -r -- "$f"; return; }
+  done
+  return 1
+}
+
+# Prepend each existing directory to path
+function _prepend_path {
+  local d
+  for d in "$@"; do
+    [[ -d "$d" ]] && path=("$d" $path)
+  done
+}
+
+# Prepend each existing directory to fpath
+function _prepend_fpath {
+  local d
+  for d in "$@"; do
+    [[ -d "$d" ]] && fpath=("$d" $fpath)
+  done
+}
+
 ## Export homebrew environment variables
-for brew in \
-  /usr/local/bin/brew \
-    /opt/homebrew/bin/brew;
-do
-  if [[ -x "${brew}" ]]; then
-    eval "$(${brew} shellenv)"
-    break
-  fi
-done
+if brew=$(_first_exec /usr/local/bin/brew /opt/homebrew/bin/brew); then
+  eval "$($brew shellenv)"
+fi
+# Default to empty string so ${HOMEBREW_PREFIX}/... expansions are safe on
+# systems without homebrew (e.g. Linux), and set -u won't error on unbound variable
+: "${HOMEBREW_PREFIX:=}"
 
 ## Use binaries from homebrew
-for dir in \
+_prepend_path \
   "${HOMEBREW_PREFIX}/opt/gawk/libexec/gnubin" \
-    "${HOMEBREW_PREFIX}/opt/gnu-sed/libexec/gnubin" \
-    "${HOMEBREW_PREFIX}/opt/findutils/libexec/gnubin" \
-    "${HOMEBREW_PREFIX}/opt/curl/bin";
-do
-  if [[ -d "${dir}" ]]; then
-    path=("${dir}" $path)
-  fi
-done
+  "${HOMEBREW_PREFIX}/opt/gnu-sed/libexec/gnubin" \
+  "${HOMEBREW_PREFIX}/opt/findutils/libexec/gnubin" \
+  "${HOMEBREW_PREFIX}/opt/curl/bin"
 
 ## Override with my own binaries
-for dir in \
+_prepend_path \
   "${HOME}/bin" \
-    "${HOME}/Library/Mobile Documents/com~apple~CloudDocs/bin";
-do
-  if [[ -d "${dir}" ]]; then
-    path=("${dir}" $path)
-  fi
-done
-
+  "${HOME}/Library/Mobile Documents/com~apple~CloudDocs/bin"
 
 ## zsh-autosuggestions
-for dir in \
-  "${HOME}/.nix-profile/share/zsh-autosuggestions" \
-    "${HOMEBREW_PREFIX}/share/zsh-autosuggestions";
-do
-  if [[ -d "${dir}" ]]; then
-    source "${dir}/zsh-autosuggestions.zsh"
-    break
-  fi
-done
+if dir=$(_first_dir \
+           "${HOME}/.nix-profile/share/zsh-autosuggestions" \
+           "${HOMEBREW_PREFIX}/share/zsh-autosuggestions"); then
+  source "${dir}/zsh-autosuggestions.zsh"
+fi
 
 ## zsh-syntax-highlighting
-for dir in \
-  "${HOME}/.nix-profile/share/zsh-syntax-highlighting" \
-    "${HOMEBREW_PREFIX}/share/zsh-syntax-highlighting";
-do
-  if [[ -d "${dir}" ]]; then
-    export ZSH_HIGHLIGHT_HIGHLIGHTERS_DIR="${dir}/highlighters"
-    source "${dir}/zsh-syntax-highlighting.zsh"
-    # Set comment color to gray
-    export ZSH_HIGHLIGHT_STYLES[comment]='fg=245'
-    break
-  fi
-done
+if dir=$(_first_dir \
+           "${HOME}/.nix-profile/share/zsh-syntax-highlighting" \
+           "${HOMEBREW_PREFIX}/share/zsh-syntax-highlighting"); then
+  export ZSH_HIGHLIGHT_HIGHLIGHTERS_DIR="${dir}/highlighters"
+  source "${dir}/zsh-syntax-highlighting.zsh"
+  export ZSH_HIGHLIGHT_STYLES[comment]='fg=245'
+fi
 
 ## zsh-completions
-for dir in \
+_prepend_fpath \
   "${HOME}/.nix-profile/share/zsh/site-functions" \
-    "${HOMEBREW_PREFIX}/share/zsh-completions";
-do
-  if [[ -d "${dir}" ]]; then
-    fpath=("${dir}" $fpath)
-  fi
-done
+  "${HOMEBREW_PREFIX}/share/zsh-completions"
 
 # Enable colored menu and scrolling completion in completion listings
 # This needs to be loaded before calling compinit.
@@ -102,6 +110,9 @@ autoload -Uz compinit
 #   hours.
 # https://gist.github.com/ctechols/ca1035271ad134841284#gistcomment-3109177
 ZSH_COMPDUMP=${ZDOTDIR:-$HOME}/.zcompdump
+# `() { }` is a zsh anonymous function, not a subshell. shellcheck does not
+# support zsh and misparses it as bash, triggering SC1072/SC1073.
+# shellcheck disable=SC1072,SC1073
 () {
   if [[ $# -gt 0 ]]; then
     compinit -u
@@ -141,15 +152,9 @@ setopt MENU_COMPLETE
 setopt LIST_PACKED
 
 # Export LS_COLORS
-for file in \
-  "${HOMEBREW_PREFIX}/bin/gdircolors" \
-    /usr/bin/dircolors;
-do
-  if [[ -x "${file}" ]]; then
-    eval "$("${file}" -b)"
-    break
-  fi
-done
+if exe=$(_first_exec "${HOMEBREW_PREFIX}/bin/gdircolors" /usr/bin/dircolors); then
+  eval "$($exe -b)"
+fi
 
 # Display lists of matches for files in different colours depending on the file
 # type
@@ -316,7 +321,7 @@ export LESS_TERMCAP_so=$'\e[33m\e[7m'
 export LESS_TERMCAP_se=$'\e[0m'
 
 # Configure pinentry to use the correct TTY
-export GPG_TTY=$(tty)
+export GPG_TTY=$TTY
 
 ## Aliases
 case $OSTYPE in
@@ -331,7 +336,7 @@ case $OSTYPE in
         export CLICOLOR=1
         export LSCOLORS='ExGxbxdxCxegedabagacad' ;;
     esac
-    alias htop='sudo /usr/local/bin/htop' ;;
+    alias htop="sudo ${HOMEBREW_PREFIX}/bin/htop" ;;
 esac
 
 alias l='ls -CF'
