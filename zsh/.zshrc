@@ -79,6 +79,15 @@ _prepend_fpath \
   "${HOME}/.nix-profile/share/zsh/site-functions" \
   "${HOMEBREW_PREFIX}/share/zsh-completions"
 
+## fzf
+if exe=$(_first_exec \
+    "${HOME}/.nix-profile/bin/fzf" \
+    "${HOMEBREW_PREFIX}/bin/fzf"); then
+  # Open in tmux popup if on tmux, otherwise use --height mode
+  export FZF_DEFAULT_OPTS='--height 40% --tmux bottom,40% --layout reverse --border top'
+  source <("$exe" --zsh)
+fi
+
 # Enable colored menu and scrolling completion in completion listings
 # This needs to be loaded before calling compinit.
 # http://zsh.sourceforge.net/Doc/Release/Zsh-Modules.html#The-zsh_002fcomplist-Module
