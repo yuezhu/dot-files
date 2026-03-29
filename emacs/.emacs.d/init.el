@@ -1554,9 +1554,8 @@ If no ID exists, this does nothing."
   ;; When editing source code blocks, use the current window
   (org-src-window-setup 'current-window)
 
-  ;; Visually indent content under headings to align with heading
-  ;; text. No actual spaces are inserted; this is purely a display
-  ;; effect.
+  ;; Visually indent content under headings to align with heading text. No
+  ;; actual spaces are inserted; this is purely a display effect.
   (org-startup-indented t)
 
   ;; Do not fold heading content on startup
@@ -1573,8 +1572,8 @@ If no ID exists, this does nothing."
   ;; alignment
   (org-tags-column 0)
 
-  ;; When creating a link to a heading, automatically assign an org ID
-  ;; to it. This enables precise heading-level links.
+  ;; When creating a link to a heading, automatically assign an org ID to
+  ;; it. This enables precise heading-level links.
   ;; (org-id-link-to-org-use-id t)
   ;; Remove ID property of clones of a subtree
   (org-clone-delete-id t)
@@ -1654,35 +1653,35 @@ If no ID exists, this does nothing."
   )
 
 
-;; `org-indent-mode' is a minor mode that visually indents text
-;; according to the outline structure of the document. It is bundled
-;; with `org'; no separate :ensure needed.
+;; `org-indent-mode' is a minor mode that visually indents text according to the
+;; outline structure of the document. It is bundled with `org'; no separate
+;; :ensure needed.
 (use-package org-indent
   :after org
   :defer t
   :diminish org-indent-mode)
 
-
+;; `org-tempo' is a module that provides easy templates for quickly inserting
+;; common org structures. It is bundled with `org'; no separate :ensure needed.
 (use-package org-tempo
   :after org
   :defer t
-  :hook
-  (org-mode
-   . (lambda ()
-       "Disable electric pairing of < when beginning a line."
-       (setq-local electric-pair-inhibit-predicate
-                   (lambda (char)
-                     (if (and (eq char ?<)
-                              (featurep 'org-tempo)
-                              (save-excursion
-                                (backward-char)
-                                (looking-back "^\\s-*" (line-beginning-position))))
-                         t
-                       (electric-pair-default-inhibit char)))))))
+  :preface
+  (defun org-tempo-cleanup-angle (result)
+    "Delete trailing > left by electric-pair after org-tempo expansion."
+    (when result
+      (save-excursion
+        (let ((bound (save-excursion (forward-line 3) (point))))
+          (when (re-search-forward "^#\\+end_[a-z]+" bound t)
+            (when (eq (char-after) ?>)
+              (delete-char 1)))))))
+
+  :config
+  (advice-add 'org-tempo-complete-tag :filter-return #'org-tempo-cleanup-angle))
 
 
-;; `org-make-toc-mode' is a minor mode that automatically generates a
-;; table of contents for an org file.
+;; `org-make-toc-mode' is a minor mode that automatically generates a table of
+;; contents for an org file.
 (use-package org-make-toc
   :ensure t
   :after org
@@ -1690,25 +1689,23 @@ If no ID exists, this does nothing."
   :hook (org-mode . org-make-toc-mode))
 
 
-;; `ox-gfm' is an org export backend that exports to GitHub Flavored
-;; Markdown.
+;; `ox-gfm' is an org export backend that exports to GitHub Flavored Markdown.
 (use-package ox-gfm
   :ensure t
   :after org
   :defer t)
 
 
-;; `org-modern' is a minor mode that provides modern visual
-;; enhancements for `org-mode'.
+;; `org-modern' is a minor mode that provides modern visual enhancements for
+;; `org-mode'.
 (use-package org-modern
   :ensure t
   :after org
   :defer t)
 
 
-;; `ob-mermaid' is an org-babel language extension that allows you to
-;; execute Mermaid code blocks in org files and have them render
-;; diagrams.
+;; `ob-mermaid' is an org-babel language extension that allows you to execute
+;; Mermaid code blocks in org files and have them render diagrams.
 (use-package ob-mermaid
   :ensure t
   :after org
@@ -1718,8 +1715,8 @@ If no ID exists, this does nothing."
   (org-babel-enable-languages '(mermaid . t)))
 
 
-;; `org-roam' is a note-taking tool that allows you to create and
-;; manage a network of interconnected notes.
+;; `org-roam' is a note-taking tool that allows you to create and manage a
+;; network of interconnected notes.
 (use-package org-roam
   :ensure t
   :defer t
@@ -1730,16 +1727,14 @@ If no ID exists, this does nothing."
   ;; Location of the SQLite database that indexes all nodes and links
   (org-roam-db-location (file-name-concat user-emacs-directory "org-roam.db"))
 
-  ;; Automatically update the database whenever a roam file is saved.
-  ;; This keeps backlinks accurate in real time at a small cost to
-  ;; save speed.
+  ;; Automatically update the database whenever a roam file is saved.  This
+  ;; keeps backlinks accurate in real time at a small cost to save speed.
   (org-roam-db-update-on-save t)
 
-  ;; Allow org headings that have an :ID: property to be treated as
-  ;; first-class roam nodes, not just the file-level #+title node.
-  ;; This is what makes it possible to link to a specific meeting-log
-  ;; heading (e.g. "** 2026-03-01") rather than just the top of the
-  ;; meeting file.
+  ;; Allow org headings that have an :ID: property to be treated as first-class
+  ;; roam nodes, not just the file-level #+title node.  This is what makes it
+  ;; possible to link to a specific meeting-log heading (e.g. "** 2026-03-01")
+  ;; rather than just the top of the meeting file.
   (org-roam-db-node-include-refs t)
 
   ;; Control how each node appears in the completion list shown by
@@ -1747,8 +1742,8 @@ If no ID exists, this does nothing."
   (org-roam-node-display-template
    (concat "${hierarchy:*} " (propertize "${tags:40}" 'face 'bold)))
 
-  ;; Subdirectory for daily note files, relative to
-  ;; org-roam-directory.  Resolves to ~/org/roam/daily/
+  ;; Subdirectory for daily note files, relative to org-roam-directory.
+  ;; Resolves to ~/org/roam/daily/
   (org-roam-dailies-directory "daily/")
 
   (org-roam-capture-templates
@@ -1768,29 +1763,25 @@ If no ID exists, this does nothing."
 
      ;; Meeting Notes
      ;;
-     ;; Single template that handles both first-time creation and
-     ;; subsequent appends for the same meeting node.
+     ;; Single template that handles both first-time creation and subsequent
+     ;; appends for the same meeting node.
      ;;
-     ;; First run (file does not exist): `org-roam' prompts for a
-     ;;   title, then file+head+olp creates the file using the header
-     ;;   template (which includes the Context section, prompted by
-     ;;   %^{Context}), creates the "Meeting Notes" heading, and
-     ;;   inserts the first dated entry.
+     ;; First run (file does not exist): `org-roam' prompts for a title, then
+     ;;   file+head+olp creates the file using the header template (which
+     ;;   includes the Context section, prompted by %^{Context}), creates the
+     ;;   "Meeting Notes" heading, and inserts the first dated entry.
      ;;
-     ;; Later runs (file already exists): The header template is
-     ;;   skipped entirely. `org-roam' finds the existing file via the
-     ;;   title search, navigates to "Meeting Notes", and appends a
-     ;;   new dated entry with a freshly generated ID.  The
-     ;;   %^{Context} prompt does NOT appear because they live inside
-     ;;   the header which is now ignored.
+     ;; Later runs (file already exists): The header template is skipped
+     ;;   entirely. `org-roam' finds the existing file via the title search,
+     ;;   navigates to "Meeting Notes", and appends a new dated entry with a
+     ;;   freshly generated ID.  The %^{Context} prompt does NOT appear because
+     ;;   they live inside the header which is now ignored.
      ("m" "Meeting Notes" entry
-      ;; entry type: `org-capture' prepends "* " automatically, so
-      ;; this content becomes a sub-heading under "Meeting Notes".
-      ;; %^u pops up a calendar; the chosen date becomes the heading
-      ;; title.  Using inactive timestamp so individual meeting
-      ;; headings do not flood the org agenda.
-      ;; %(org-id-new) is evaluated at expansion time and produces a
-      ;; %UUID.
+      ;; entry type: `org-capture' prepends "* " automatically, so this content
+      ;; becomes a sub-heading under "Meeting Notes".  %^u pops up a calendar;
+      ;; the chosen date becomes the heading title.  Using inactive timestamp so
+      ;; individual meeting headings do not flood the org agenda.  %(org-id-new)
+      ;; is evaluated at expansion time and produces a %UUID.
       "
 * %^u
 :PROPERTIES:
@@ -1800,9 +1791,8 @@ If no ID exists, this does nothing."
       :target (file+head+olp
                ;; path: node files go into the meetings/ subdirectory
                "meetings/${slug}.org"
-               ;; header: used only when the file is created for the
-               ;; first time; %^{} prompts appear here because this is
-               ;; first-run only
+               ;; header: used only when the file is created for the first time;
+               ;; %^{} prompts appear here because this is first-run only
                "
 #+title: ${title}
 #+filetags: :meeting:
@@ -1817,8 +1807,8 @@ If no ID exists, this does nothing."
       :prepend t)
      ))
 
-  ;; These are separate from `org-roam-capture-templates' and are
-  ;; only triggered by org-roam-dailies-* commands.
+  ;; These are separate from `org-roam-capture-templates' and are only triggered
+  ;; by org-roam-dailies-* commands.
   ;; The :target path is relative to `org-roam-dailies-directory'.
   (org-roam-dailies-capture-templates
    '(
@@ -1834,10 +1824,10 @@ If no ID exists, this does nothing."
 
      ;; Meeting Notes reference entry
      ;;
-     ;; Use this after finishing a meeting capture (template "m"
-     ;; above). By the time you trigger this template the meeting ID
-     ;; should be copied to the clipboard, so you only need to type
-     ;; C-c C-l → id: → C-y to paste it as a link.
+     ;; Use this after finishing a meeting capture (template "m" above). By the
+     ;; time you trigger this template the meeting ID should be copied to the
+     ;; clipboard, so you only need to type C-c C-l → id: → C-y to paste it as a
+     ;; link.
      ;;
      ;; Workflow:
      ;;   1. C-c n c → m          capture the meeting entry (ID auto-copied)
@@ -1855,8 +1845,8 @@ If no ID exists, this does nothing."
 #+title: %<%Y-%m-%d>
 #+filetags: :daily:
 "
-               ;; All meeting references in a daily go under the
-               ;; "Meetings" section
+               ;; All meeting references in a daily go under the "Meetings"
+               ;; section
                ("Meetings")))
      ))
 
@@ -1875,28 +1865,26 @@ If no ID exists, this does nothing."
          )
 
   :config
-  ;; Ensure the meetings/ subdirectory exists. The Meeting Notes
-  ;; capture template expects to find it.
+  ;; Ensure the meetings/ subdirectory exists. The Meeting Notes capture
+  ;; template expects to find it.
   (make-directory (concat (file-name-as-directory org-roam-directory)
                           "meetings")
                   t)
 
-  ;; Start the background process that keeps the database in sync with
-  ;; files on disk
+  ;; Start the background process that keeps the database in sync with files on
+  ;; disk
   (org-roam-db-autosync-mode)
 
 
   ;; Why does this go here and not in the :preface section?
   ;;
-  ;; `cl-defmethod' declares (node org-roam-node) in its parameter
-  ;; list, which tells Emacs this method specializes on the
-  ;; `org-roam-node' type. At definition time, Emacs needs to resolve
-  ;; that type — if it doesn't exist yet, you get the "unknown
-  ;; specializer" error.
-  ;; `org-roam-node' is defined by a `cl-defstruct' inside the
-  ;; `org-roam' package. So,`org-roam' must have been loaded for the
-  ;; `cl-defstruct' to register the type and for `org-roam-node' to be
-  ;; available.
+  ;; `cl-defmethod' declares (node org-roam-node) in its parameter list, which
+  ;; tells Emacs this method specializes on the `org-roam-node' type. At
+  ;; definition time, Emacs needs to resolve that type — if it doesn't exist
+  ;; yet, you get the "unknown specializer" error.
+  ;; `org-roam-node' is defined by a `cl-defstruct' inside the `org-roam'
+  ;; package. So,`org-roam' must have been loaded for the `cl-defstruct' to
+  ;; register the type and for `org-roam-node' to be available.
   (cl-defmethod org-roam-node-hierarchy ((node org-roam-node))
     "Return full hierarchy path for NODE."
     (let ((title (org-roam-node-title node))
