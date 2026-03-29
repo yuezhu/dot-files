@@ -65,10 +65,16 @@ if dir=$(_first_dir \
   source "${dir}/zsh-autosuggestions.zsh"
 fi
 
-## zsh-syntax-highlighting
+
+## zsh-fast-syntax-highlighting
 if dir=$(_first_dir \
-           "${HOME}/.nix-profile/share/zsh-syntax-highlighting" \
-           "${HOMEBREW_PREFIX}/share/zsh-syntax-highlighting"); then
+           "${HOME}/.nix-profile/share/zsh-fast-syntax-highlighting" \
+           "${HOMEBREW_PREFIX}/share/zsh-fast-syntax-highlighting"); then
+  source "${dir}/fast-syntax-highlighting.plugin.zsh"
+elif dir=$(_first_dir \
+             "${HOME}/.nix-profile/share/zsh-syntax-highlighting" \
+             "${HOMEBREW_PREFIX}/share/zsh-syntax-highlighting"); then
+  # Or try zsh-syntax-highlighting
   export ZSH_HIGHLIGHT_HIGHLIGHTERS_DIR="${dir}/highlighters"
   source "${dir}/zsh-syntax-highlighting.zsh"
   export ZSH_HIGHLIGHT_STYLES[comment]='fg=245'
@@ -81,10 +87,9 @@ _prepend_fpath \
 
 ## fzf
 if exe=$(_first_exec \
-    "${HOME}/.nix-profile/bin/fzf" \
-    "${HOMEBREW_PREFIX}/bin/fzf"); then
-  # Open in tmux popup if on tmux, otherwise use --height mode
-  export FZF_DEFAULT_OPTS='--height 40% --tmux bottom,40% --layout reverse --border top'
+           "${HOME}/.nix-profile/bin/fzf" \
+           "${HOMEBREW_PREFIX}/bin/fzf"); then
+  export FZF_DEFAULT_OPTS='--height 40% --layout reverse --border top'
   source <("$exe" --zsh)
 fi
 
