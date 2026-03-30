@@ -89,7 +89,7 @@ _prepend_fpath \
 if exe=$(_first_exec \
            "${HOME}/.nix-profile/bin/fzf" \
            "${HOMEBREW_PREFIX}/bin/fzf"); then
-  export FZF_DEFAULT_OPTS='--height 40% --layout reverse --border top'
+  export FZF_DEFAULT_OPTS='--height 40% --layout reverse --border top --bind ctrl-v:page-down,alt-v:page-up'
   source <("$exe" --zsh)
 fi
 
