@@ -89,8 +89,32 @@ _prepend_fpath \
 if exe=$(_first_exec \
            "${HOME}/.nix-profile/bin/fzf" \
            "${HOMEBREW_PREFIX}/bin/fzf"); then
-  export FZF_DEFAULT_OPTS='--height 40% --layout reverse --border top --bind ctrl-v:page-down,alt-v:page-up'
+  export FZF_DEFAULT_OPTS="--height 40% \
+--layout reverse \
+--border top \
+--bind \
+ctrl-a:beginning-of-line,\
+ctrl-e:end-of-line,\
+ctrl-f:forward-char,\
+ctrl-b:backward-char,\
+ctrl-d:delete-char,\
+ctrl-h:backward-delete-char,\
+ctrl-k:kill-line,\
+ctrl-u:unix-line-discard,\
+ctrl-w:unix-word-rubout,\
+alt-v:page-up,\
+ctrl-v:page-down,\
+alt-f:forward-word,\
+alt-b:backward-word,\
+alt-d:kill-word,\
+alt-bs:backward-kill-word"
+
   source <("$exe" --zsh)
+fi
+
+# Export LS_COLORS
+if exe=$(_first_exec "${HOMEBREW_PREFIX}/bin/gdircolors" /usr/bin/dircolors); then
+  eval "$($exe -b)"
 fi
 
 # Enable colored menu and scrolling completion in completion listings
@@ -136,7 +160,6 @@ ZSH_COMPDUMP=${ZDOTDIR:-$HOME}/.zcompdump
 } ${ZSH_COMPDUMP}(N.mh+24)
 
 # http://zsh.sourceforge.net/Doc/Release/Options.html
-# 16.2.2 Completion
 # If a completion is performed with the cursor within a word, and a full
 # completion is inserted, the cursor is moved to the end of the word. That is,
 # the cursor is moved to the end of the word if either a single match is
@@ -147,70 +170,58 @@ setopt ALWAYS_TO_END
 # started. Otherwise it stays there and completion is done from both ends.
 setopt COMPLETE_IN_WORD
 
-# When listing files that are possible completions, show the type of each file
-# with a trailing identifying mark, like the -F option to ls.
-setopt LIST_TYPES
+if dir=$(_first_dir \
+           "${HOME}/.nix-profile/share/fzf-tab" \
+           "${HOMEBREW_PREFIX}/share/fzf-tab"); then
+  source "${dir}/fzf-tab.zsh"
 
-# Lay out the matches in completion lists sorted horizontally, that is, the
-# second match is to the right of the first one, not under it as usual.
-setopt LIST_ROWS_FIRST
+  # To make fzf-tab follow FZF_DEFAULT_OPTS.
+  # NOTE: This may lead to unexpected behavior since some flags break this plugin. See Aloxaf/fzf-tab#455.
+  zstyle ':fzf-tab:*' use-fzf-default-opts yes
 
-# On an ambiguous completion, instead of listing possibilities or beeping,
-# insert the first match immediately.
-# This causes the current candidate to be selected and inserted immediately
-# without having to press TAB.
-setopt MENU_COMPLETE
+  # force zsh not to show completion menu, which allows fzf-tab to capture the unambiguous prefix
+  zstyle ':completion:*' menu no
 
-# Try to make the completion list smaller (occupying less lines) by printing
-# the matches in columns with different widths.
-setopt LIST_PACKED
+else
+  # When listing files that are possible completions, show the type of each file
+  # with a trailing identifying mark, like the -F option to ls.
+  setopt LIST_TYPES
 
-# Export LS_COLORS
-if exe=$(_first_exec "${HOMEBREW_PREFIX}/bin/gdircolors" /usr/bin/dircolors); then
-  eval "$($exe -b)"
+  # Lay out the matches in completion lists sorted horizontally, that is, the
+  # second match is to the right of the first one, not under it as usual.
+  setopt LIST_ROWS_FIRST
+
+  # On an ambiguous completion, instead of listing possibilities or beeping,
+  # insert the first match immediately.
+  # This causes the current candidate to be selected and inserted immediately
+  # without having to press TAB.
+  setopt MENU_COMPLETE
+
+  # Try to make the completion list smaller (occupying less lines) by printing
+  # the matches in columns with different widths.
+  setopt LIST_PACKED
+
+  # Incremental completion searching
+  bindkey -M menuselect '^s' history-incremental-search-forward
+
+  # Enable menu selection
+  # Display a list of candidates for an ambiguous completion when hitting TAB
+  zstyle ':completion:*' menu select
+
+  # Highlight the first ambiguous character in completion lists
+  zstyle ':completion:*' show-ambiguity true
+
+  # Enable scrolling through a completion list
+  zstyle ':completion:*:default' list-prompt ''
+
 fi
 
 # Display lists of matches for files in different colours depending on the file
 # type
-# 22.7.1 Colored completion listings
 zstyle ':completion:*' list-colors ${(s.:.)LS_COLORS}
-
-# Enable scrolling through a completion list
-# 22.7.2 Scrolling in completion listings
-zstyle ':completion:*:default' list-prompt ''
-
-# Enable menu selection
-# Display a list of candidates for an ambiguous completion when hitting TAB
-zstyle ':completion:*' menu select
-
-# Matches in the same group are shown together
-zstyle ':completion:*' group-name ''
 
 # Enable completion for `.' and `..' special directories
 zstyle ':completion:*' special-dirs true
-
-# Directories to be completed are listed separately from and before completion
-# for other files, regardless of tag ordering.
-zstyle ':completion:*' list-dirs-first true
-
-# Describe completion
-zstyle ':completion:*' auto-description '%Bspecify: %d%b'
-zstyle ':completion:*:corrections' format '%B%F{yellow}───── %d (errors: %e) ─────%f%b'
-zstyle ':completion:*:descriptions' format '%B%F{green}───── %d ─────%f%b'
-zstyle ':completion:*:messages' format '%B%F{white}───── %d ─────%f%b'
-zstyle ':completion:*:warnings' format '%B%F{red}───── no completions ─────%f%b'
-
-# Allow fuzzy and `*' matching completion
-zstyle ':completion:*' completer _complete _match _approximate
-
-# Remove duplicate matches for _history completer
-zstyle ':completion:*' remove-all-dups true
-
-# Highlight the first ambiguous character in completion lists
-zstyle ':completion:*' show-ambiguity true
-
-# When `*' is present, only matching `*' and no other completion is made.
-zstyle ':completion:*:match:*' original only
 
 # Increase the number of errors based on the length of the typed word
 # zstyle -e ':completion:*:approximate:*' max-errors 'reply=($((($#PREFIX+$#SUFFIX)/3))numeric)'
@@ -225,16 +236,11 @@ zstyle ':completion:*:*:*:users' ignored-patterns '_*'
 # Ignore backup files when completing commands
 zstyle ':completion:*:complete:-command-::commands' ignored-patterns '*\~'
 
-# Reorder completion for tilde
-zstyle ':completion::*:-tilde-:*:*' group-order named-directories users directory-stack
-
 # Kill command completion
 zstyle ':completion:*:*:kill:*:processes' command 'ps -U ${USERNAME} -o pid,user,command | sed "/ps -U '${USERNAME}'/d"'
 
 # Colorize kill completion menu
 zstyle ':completion:*:*:*:*:processes' list-colors '=(#b) #([0-9]##) ([0-9a-z_-]##) *=0=31=36'
-
-bindkey -M menuselect '^s' history-incremental-search-forward
 
 ## History
 HISTSIZE=1000000
@@ -300,11 +306,6 @@ PROMPT='%B%F{green}%m%f %F{blue}%~%f${vcs_info_msg_0_} %(!.#.$)%b '
 ## MISC
 # Report command running time if its user/system takes longer than 10 seconds
 # REPORTTIME=10
-
-# 16.2.6 Input/Output
-# Print the exit value of programs with non-zero exit status.
-# 09/01/21 disabled becuase this's misleading for some cases.
-# setopt PRINT_EXIT_VALUE
 
 # Try to correct the spelling of all arguments in a line.
 # The shell variable CORRECT_IGNORE_FILE may be set to a pattern to match file
