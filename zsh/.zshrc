@@ -338,6 +338,9 @@ export LESS_TERMCAP_se=$'\e[0m'
 # Configure pinentry to use the correct TTY
 export GPG_TTY=$TTY
 
+# Disable the suspend keybinding (Ctrl-Z)
+stty susp undef
+
 ## Aliases
 case $OSTYPE in
   *linux*)
