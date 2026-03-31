@@ -2444,8 +2444,32 @@ If no symbol at point, quit the *Help* window if visible."
 
 
 ;;
-;; Configure additional keybindings
+;; Functions and keybindings
 ;;
+(defun copy-buffer-path (&optional relative-to)
+  "Copy the current buffer's file path to the kill ring.
+When RELATIVE-TO is non-nil, copy the path relative to that
+directory. Otherwise, copy the full absolute path.
+"
+  (interactive)
+  (if-let ((path (or buffer-file-name
+                     (and (derived-mode-p 'dired-mode)
+                          default-directory))))
+      (let* ((full (expand-file-name path))
+             (result (if relative-to
+                         (file-relative-name full relative-to)
+                       full)))
+        (kill-new result)
+        (message "Copied path: %s" result))
+    (message "Buffer is not visiting a file or directory")))
+
+(defun copy-buffer-project-path ()
+  "Copy the project-relative path of the current buffer's file to the kill ring.
+If no project is found, fall back to the absolute path."
+  (interactive)
+  (copy-buffer-path (when-let ((proj (project-current)))
+                      (project-root proj))))
+
 ;; `C-x k' is `kill-buffer' by default.
 (bind-key "C-x k" #'kill-current-buffer)
 ;; `C-z' is `suspend-frame' by default, but I don't use it and might
