@@ -59,15 +59,16 @@ Usage:
 
 
 
-(defun fit-window-half-frame (min-height window)
-  "Fit WINDOW to its buffer, capped at half frame height.
-MIN-HEIGHT is the minimum height of the window, in lines.  This is
-intended for use in `display-buffer-alist' to display certain buffers
-in a window that is half the frame height, but not smaller than
-MIN-HEIGHT."
+(defun fit-window-to-frame-fraction (min-height-lines max-height-fraction window)
+  "Fit WINDOW to its buffer, with height bounded by MIN-HEIGHT-LINES and MAX-HEIGHT-FRACTION.
+MIN-HEIGHT-LINES is the minimum height of the window, in lines.
+MAX-HEIGHT-FRACTION is the maximum height as a fraction of the frame height
+\(e.g. 0.5 for half).  This is intended for use in `display-buffer-alist'."
+  ;; 0 is safe for both MAX-HEIGHT and MIN-HEIGHT: `fit-window-to-buffer'
+  ;; clamps to frame height and `window-min-height' respectively.
   (fit-window-to-buffer window
-                        (/ (frame-height) 2)
-                        min-height))
+                        (floor (* (frame-height) max-height-fraction))
+                        min-height-lines))
 
 
 ;;
@@ -1057,8 +1058,15 @@ this is effective with some expand functions, eg.,
   :hook
   (minibuffer-setup
    . (lambda ()
-       "Allow `vertico' to use half the frame height."
-       (setq-local vertico-count (/ (frame-height) 2))))
+       ;; Save Vertico session for `vertico-repeat'
+       (vertico-repeat-save)
+
+       ;; Allow `vertico' to use 40% frame height."
+       (setq-local vertico-count (max window-min-height
+                                      (floor (* (frame-height) 0.4))))))
+
+  :bind
+  ("M-R" . vertico-repeat)
 
   :custom
   ;; (vertico-scroll-margin 0) ;; Different scroll margin
@@ -2025,7 +2033,7 @@ This only affects the current markdown buffer, and does not add the
                  (display-buffer-at-bottom)
                  (inhibit-same-window . t)
                  (window-height . ,(apply-partially
-                                    #'fit-window-half-frame 10))))
+                                    #'fit-window-to-frame-fraction 10 0.5))))
 
   (reformatter-define clang-format
     :program "clang-format"
@@ -2261,7 +2269,7 @@ If no symbol at point, quit the *Help* window if visible."
                  (display-buffer-at-bottom)
                  (inhibit-same-window . t)
                  (window-height . ,(apply-partially
-                                    #'fit-window-half-frame 10)))))
+                                    #'fit-window-to-frame-fraction 10 0.5)))))
 
 
 (use-package go-rename
