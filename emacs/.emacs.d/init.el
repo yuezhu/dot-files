@@ -3,6 +3,33 @@
 ;; Used to report time spent loading this module
 (defconst emacs-start-time (current-time))
 
+;; GC was suspended in the early-init.el during startup to speed up
+;; initialization. Restore GC config and run GC after Emacs startup.
+;; `after-init-hook' runs right after your init file is loaded, but
+;; before the initial frame is fully set up and before the startup
+;; screen/scratch buffer is displayed.
+;; `emacs-startup-hook' runs after `after-init-hook', and after the
+;; command-line has been fully processed, the startup screen has been
+;; displayed, and everything is ready.
+(add-hook 'after-init-hook
+          #'(lambda ()
+              (setq gc-cons-percentage 0.5
+                    gc-cons-threshold (* 128 1024 1024))
+              (garbage-collect))
+          t)
+
+;; Report elapsed time and GC count
+;; https://github.com/jwiegley/dot-emacs/blob/master/init.org
+(defun report-time-since-load (&optional suffix)
+  (message "Loading init...done (%.3fs) (GC: %d)%s"
+           (float-time (time-subtract (current-time) emacs-start-time))
+           gcs-done
+           (or suffix "")))
+
+(add-hook 'after-init-hook
+          #'(lambda () (report-time-since-load " [after-init]"))
+          t)
+
 ;; `file-name-handler-alist' maps filename patterns (regexes) to
 ;; special handler functions. When Emacs opens or operates on a file
 ;; whose name matches a pattern, it routes the operation through that
@@ -22,6 +49,7 @@
 (add-hook 'after-init-hook
           #'(lambda ()
               (setq file-name-handler-alist file-name-handler-alist-old)))
+
 
 ;; Add local lisp files directory to `load-path'.
 (add-to-list 'load-path (expand-file-name "lisp" user-emacs-directory))
@@ -76,11 +104,10 @@ MAX-HEIGHT-FRACTION is the maximum height as a fraction of the frame height
 ;;
 (require 'package)
 
-;; Some packages are built into Emacs, but I want to use the ELPA
-;; versions.
+;; Some packages are built into Emacs, but I want to use ELPA versions.
 (defconst package-must-use-elpa-packages
   '(modus-themes org)
-  "A list of packages that must use the ELPA versions.")
+  "A list of packages that must use ELPA versions.")
 
 (advice-add 'package-installed-p :around
             (lambda (func &rest args)
@@ -98,9 +125,9 @@ MAX-HEIGHT-FRACTION is the maximum height as a fraction of the frame height
   (package-refresh-contents))
 
 ;;
-;; Initialize `use-package'
+;; Configure `use-package'
 ;;
-(setq use-package-always-defer t
+(setq use-package-always-defer nil
       use-package-enable-imenu-support t)
 
 ;; `init-file-debug' will be t when Emacs is launched with the
@@ -111,32 +138,23 @@ MAX-HEIGHT-FRACTION is the maximum height as a fraction of the frame height
         use-package-compute-statistics t
         debug-on-error t))
 
-(unless (package-installed-p 'use-package)
-  (package-install 'use-package))
-
-(eval-when-compile
-  (require 'use-package))
-
-
 ;;
 ;; Packages configurations
 ;;
 (use-package diminish
   :ensure t
-  :commands diminish)
+  :defer t)
 
 
 ;; (use-package emacs ...) is a common idiom for configuring built-in
 ;; Emacs settings that don't belong to any specific package.  Since
 ;; "emacs" is not a real package, `use-package' treats it as always
-;; loaded, so all forms (:init, :config, :custom) run immediately at
-;; init time with no deferral.
+;; loaded.
 ;; Refer to lisp/loadup.el for the core libraries always loaded
 ;; during Emacs startup, and src/*.c for C-level primitives and
 ;; their default values.
 (use-package emacs
-  :no-require t
-  :defer t
+  :demand t
   :diminish auto-fill-function
 
   :hook
@@ -146,8 +164,8 @@ MAX-HEIGHT-FRACTION is the maximum height as a fraction of the frame height
 
   :custom
   ;; src/nsterm.m
-  (ns-alternate-modifier 'super)
-  (ns-command-modifier 'meta)
+  ;; (ns-alternate-modifier 'super)
+  ;; (ns-command-modifier 'meta)
 
   ;; src/frame.c
   (menu-bar-mode (eq system-type 'darwin))
@@ -211,14 +229,23 @@ MAX-HEIGHT-FRACTION is the maximum height as a fraction of the frame height
   (confirm-kill-emacs 'yes-or-no-p)
   (directory-free-space-args "-Pkh")
   (find-file-visit-truename t)
+  (large-file-warning-threshold 50000000)
   (make-backup-files nil)
   (mode-require-final-newline t)
   (require-final-newline t)
 
+  ;; font-core.el
+  (global-font-lock-mode t)
+
+  ;; frame.el
+  (blink-cursor-mode nil)
+
   ;; mouse.el
-  ;; Enable context menu. `vertico-multiform-mode' adds a menu in the
-  ;; minibuffer to switch display modes.
+  ;; Enable context menu. `vertico-multiform-mode' adds a menu in the minibuffer
+  ;; to switch display modes.
   (context-menu-mode t)
+  (mouse-drag-copy-region t)
+  (mouse-yank-at-point t)
 
   ;; simple.el
   (column-number-mode t)
@@ -240,13 +267,9 @@ MAX-HEIGHT-FRACTION is the maximum height as a fraction of the frame height
    '(left-curly-arrow right-curly-arrow))
 
   ;; startup.el
-  ;; `simple' is one of Emacs's core built-in libraries. It provides a
-  ;; large collection of fundamental editing commands and utilities
-  ;; that are so basic they're loaded by default.
   (inhibit-startup-screen t)
   (initial-major-mode 'fundamental-mode)
   (initial-scratch-message nil)
-  (large-file-warning-threshold 50000000)
 
   ;; indent.el
   ;; TAB first tries to indent the current line, and if the line was
@@ -256,30 +279,52 @@ MAX-HEIGHT-FRACTION is the maximum height as a fraction of the frame height
   ;; minibuffer.el
   (completion-cycle-threshold nil)
 
-  :custom-face
-  (aw-leading-char-face
-   ((t (:inherit aw-leading-char-face :weight bold :height 3.0))))
-
   :init
   (add-hook 'after-save-hook
             #'executable-make-buffer-file-executable-if-script-p))
 
 
-(use-package scroll-bar
-  :defer t
+;; Loaded in loadup.el
+(use-package window
   :custom
-  (scroll-bar-mode nil))
+  (scroll-error-top-bottom t))
 
 
-(use-package mouse
-  :defer t
+;; Loaded in loadup.el
+(use-package isearch
+  :bind (:map isearch-mode-map
+              ;; DEL during isearch should edit the search string, not jump
+              ;; back to the previous result
+              ;; https://github.com/purcell/emacs.d/blob/b484cada4356803d0ecb063d33546835f996fefe/lisp/init-isearch.el#L14
+              ([remap isearch-delete-char] . isearch-del-char))
   :custom
-  (mouse-drag-copy-region t)
-  (mouse-yank-at-point t))
+  (isearch-allow-scroll t)
+  (search-highlight t))
+
+
+;; Loaded in loadup.el
+(use-package replace
+  :custom
+  (list-matching-lines-default-context-lines 3)
+  (query-replace-highlight t))
+
+
+;; Loaded in loadup.el
+(use-package select
+  :custom
+  (select-enable-clipboard t))
+
+
+;; Loaded in loadup.el
+(use-package uniquify
+  :custom
+  (uniquify-after-kill-buffer-p t)
+  (uniquify-buffer-name-style
+   'post-forward-angle-brackets nil (uniquify)))
 
 
 (use-package mwheel
-  :defer t
+  :if (display-graphic-p)
   :custom
   (mouse-wheel-progressive-speed nil))
 
@@ -287,7 +332,6 @@ MAX-HEIGHT-FRACTION is the maximum height as a fraction of the frame height
 ;; Enable mouse support in terminal Emacs via xterm mouse reporting.
 (use-package xt-mouse
   :unless (display-graphic-p)
-  :demand t
   :custom
   (xterm-mouse-mode 1))
 
@@ -295,7 +339,6 @@ MAX-HEIGHT-FRACTION is the maximum height as a fraction of the frame height
 ;; Configure xterm terminal features for terminal Emacs.
 (use-package term/xterm
   :unless (display-graphic-p)
-  :demand t
   :custom
   ;; Don't let Emacs set the terminal window title.
   (xterm-set-window-title nil)
@@ -309,7 +352,6 @@ MAX-HEIGHT-FRACTION is the maximum height as a fraction of the frame height
 (use-package term/tmux
   :if (and (not (display-graphic-p))
            (getenv "TMUX"))
-  :demand t
   :custom
   ;; - setSelection: OSC 52 clipboard - tmux (set-clipboard on)
   ;;   intercepts and forwards to the outer terminal's clipboard
@@ -342,12 +384,6 @@ MAX-HEIGHT-FRACTION is the maximum height as a fraction of the frame height
   (warning-minimum-level :error))
 
 
-(use-package window
-  :defer t
-  :custom
-  (scroll-error-top-bottom t))
-
-
 (use-package delsel
   :defer t
   :custom
@@ -366,51 +402,6 @@ MAX-HEIGHT-FRACTION is the maximum height as a fraction of the frame height
   :defer t
   :custom
   (auto-image-file-mode t))
-
-
-(use-package font-core
-  :defer t
-  :custom
-  (global-font-lock-mode t))
-
-
-(use-package frame
-  :defer t
-  :custom
-  (blink-cursor-mode nil))
-
-
-(use-package isearch
-  :no-require t
-  :bind (:map isearch-mode-map
-              ;; DEL during isearch should edit the search string, not jump
-              ;; back to the previous result
-              ;; https://github.com/purcell/emacs.d/blob/b484cada4356803d0ecb063d33546835f996fefe/lisp/init-isearch.el#L14
-              ([remap isearch-delete-char] . isearch-del-char))
-  :custom
-  (isearch-allow-scroll t)
-  (search-highlight t))
-
-
-(use-package replace
-  :defer t
-  :custom
-  (list-matching-lines-default-context-lines 3)
-  (query-replace-highlight t))
-
-
-(use-package select
-  :defer t
-  :custom
-  (select-enable-clipboard t))
-
-
-(use-package uniquify
-  :defer t
-  :custom
-  (uniquify-after-kill-buffer-p t)
-  (uniquify-buffer-name-style
-   'post-forward-angle-brackets nil (uniquify)))
 
 
 (use-package hl-line
@@ -533,6 +524,7 @@ MAX-HEIGHT-FRACTION is the maximum height as a fraction of the frame height
 
 (use-package ialign
   :ensure t
+  :defer t
   :bind ("C-c |" . ialign))
 
 
@@ -548,6 +540,8 @@ MAX-HEIGHT-FRACTION is the maximum height as a fraction of the frame height
   :if (memq window-system '(mac ns))
   :demand t
   :custom
+  (mac-command-modifier 'meta)
+  (mac-option-modifier 'super)
   (ns-pop-up-frames nil))
 
 
@@ -1037,18 +1031,16 @@ this is effective with some expand functions, eg.,
   :defer t)
 
 
-;; Prevent cursor from moving onto the minibuffer prompt
-(use-package cursor-sensor
-  :defer t
-  :hook
-  (minibuffer-setup . cursor-intangible-mode))
-
-
 (use-package orderless
   :ensure t
   :custom
+  ;; Configure a custom style dispatcher (see the Consult wiki)
+  ;; (orderless-style-dispatchers '(+orderless-consult-dispatch orderless-affix-dispatch))
+  ;; (orderless-component-separator #'orderless-escapable-split-on-space)
   (completion-styles '(orderless basic))
-  (completion-category-overrides '((file (styles basic partial-completion)))))
+  (completion-category-overrides '((file (styles partial-completion))))
+  (completion-category-defaults nil) ;; Disable defaults, use our settings
+  (completion-pcm-leading-wildcard t)) ;; Emacs 31: partial-completion behaves like substring
 
 
 (use-package vertico
@@ -1348,7 +1340,10 @@ this is effective with some expand functions, eg.,
   :defer t
   :bind ("M-o" . ace-window)
   :custom
-  (aw-scope 'frame))
+  (aw-scope 'frame)
+  :custom-face
+  (aw-leading-char-face
+   ((t (:inherit aw-leading-char-face :weight bold :height 3.0)))))
 
 
 (use-package ace-link
@@ -1435,14 +1430,6 @@ this is effective with some expand functions, eg.,
              (setq term-prompt-regexp "^[^#$%>\n]*[#$%>] *")
              (setq-local transient-mark-mode nil)
              (auto-fill-mode -1))))
-
-
-(use-package terminal-here
-  :if window-system
-  :ensure t
-  :defer t
-  :custom
-  (terminal-here-mac-terminal-command 'iterm2))
 
 
 (use-package cwarn
@@ -2441,8 +2428,7 @@ If no symbol at point, quit the *Help* window if visible."
                   (set-face-attribute
                    'default nil :font
                    "-*-Menlo-regular-normal-normal-*-14-*-*-*-*-0-iso10646-1")))
-                (set-frame-parameter nil 'fullscreen 'maximized))
-            t))
+                (set-frame-parameter nil 'fullscreen 'maximized))))
 
 
 ;; Use a heavier box-drawing character for the vertical window border
@@ -2484,33 +2470,5 @@ If no project is found, fall back to the absolute path."
 ;; accidentally suspend Emacs.
 (unbind-key "C-z")
 
-;; GC was suspended in the early-init.el during startup to speed up
-;; initialization. Restore GC config and run GC after Emacs startup.
-;; `after-init-hook' runs right after your init file is loaded, but
-;; before the initial frame is fully set up and before the startup
-;; screen/scratch buffer is displayed.
-;; `emacs-startup-hook' runs after `after-init-hook', and after the
-;; command-line has been fully processed, the startup screen has been
-;; displayed, and everything is ready.
-(add-hook 'after-init-hook
-          #'(lambda ()
-              (setq gc-cons-percentage 0.5
-                    gc-cons-threshold (* 128 1024 1024))
-              (garbage-collect))
-          t)
-
-;;
-;; Display elapsed time and GC count
-;;
-;; https://github.com/jwiegley/dot-emacs/blob/master/init.org
-(defun report-time-since-load (&optional suffix)
-  (message "Loading init...done (%.3fs) (GC: %d)%s"
-           (float-time (time-subtract (current-time) emacs-start-time))
-           gcs-done
-           (or suffix "")))
-
-(add-hook 'after-init-hook
-          #'(lambda () (report-time-since-load " [after-init]"))
-          t)
 
 (report-time-since-load)
