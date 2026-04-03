@@ -329,6 +329,12 @@ function xterm_title {
 
 add-zsh-hook precmd xterm_title
 
+# Disable the suspend keybinding (Ctrl-Z)
+stty susp undef
+
+# Use steady block cursor
+echo -ne '\e[2 q'
+
 ## Use less as terminal pager
 export PAGER=less
 export LESS='--ignore-case --LONG-PROMPT --RAW-CONTROL-CHARS --window=-4'
@@ -337,9 +343,6 @@ export LESS_TERMCAP_se=$'\e[0m'
 
 # Configure pinentry to use the correct TTY
 export GPG_TTY=$TTY
-
-# Disable the suspend keybinding (Ctrl-Z)
-stty susp undef
 
 ## Aliases
 case $OSTYPE in
