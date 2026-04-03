@@ -1073,7 +1073,15 @@ this is effective with some expand functions, eg.,
 
   :config
   (vertico-mode)
-  (vertico-multiform-mode))
+  (vertico-multiform-mode)
+
+  (defun log-vertico-exit (&rest _)
+    (message "[DEBUG] vertico exit: minibuffer='%s' candidate='%s' command='%s'"
+             (minibuffer-contents)
+             (vertico--candidate)
+             this-command))
+
+  (advice-add 'vertico-exit :before #'log-vertico-exit))
 
 
 (use-package consult
