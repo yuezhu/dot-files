@@ -68,7 +68,7 @@ fi
 
 ## zsh-fast-syntax-highlighting
 if dir=$(_first_dir \
-           "${HOME}/.nix-profile/share/zsh-fast-syntax-highlighting" \
+           "${HOME}/.nix-profile/share/zsh/plugins/fast-syntax-highlighting" \
            "${HOMEBREW_PREFIX}/share/zsh-fast-syntax-highlighting"); then
   source "${dir}/fast-syntax-highlighting.plugin.zsh"
 elif dir=$(_first_dir \
