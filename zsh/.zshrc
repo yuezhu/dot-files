@@ -92,6 +92,8 @@ if exe=$(_first_exec \
   export FZF_DEFAULT_OPTS="--height 40% \
 --layout reverse \
 --border top \
+--wrap \
+--highlight-line \
 --bind \
 ctrl-a:beginning-of-line,\
 ctrl-e:end-of-line,\
@@ -108,6 +110,13 @@ alt-f:forward-word,\
 alt-b:backward-word,\
 alt-d:kill-word,\
 alt-bs:backward-kill-word"
+  export FZF_CTRL_R_OPTS="--wrap-sign '"$'\t'"↳ ' \
+--exact \
+--no-sort \
+--preview 'echo {}' \
+--preview-window hidden,wrap \
+--bind 'alt-.:toggle-preview' \
+--color 'hl:underline:yellow,hl+:underline:yellow:bold'"
 
   source <("$exe" --zsh)
 fi
