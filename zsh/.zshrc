@@ -179,6 +179,9 @@ setopt ALWAYS_TO_END
 # started. Otherwise it stays there and completion is done from both ends.
 setopt COMPLETE_IN_WORD
 
+# Do not require a leading '.' in a filename to be matched explicitly.
+setopt GLOB_DOTS
+
 if dir=$(_first_dir \
            "${HOME}/.nix-profile/share/fzf-tab" \
            "${HOMEBREW_PREFIX}/share/fzf-tab"); then
@@ -187,6 +190,10 @@ if dir=$(_first_dir \
   # To make fzf-tab follow FZF_DEFAULT_OPTS.
   # NOTE: This may lead to unexpected behavior since some flags break this plugin. See Aloxaf/fzf-tab#455.
   zstyle ':fzf-tab:*' use-fzf-default-opts yes
+
+  # The default fzf-pad=2 was designed for fzf without --border. My
+  # FZF_DEFAULT_OPTS that includes --border adds an extra line to the fzf window.
+  zstyle ':fzf-tab:*' fzf-pad 3
 
   # force zsh not to show completion menu, which allows fzf-tab to capture the unambiguous prefix
   zstyle ':completion:*' menu no
@@ -229,8 +236,8 @@ fi
 # type
 zstyle ':completion:*' list-colors ${(s.:.)LS_COLORS}
 
-# Enable completion for `.' and `..' special directories
-zstyle ':completion:*' special-dirs true
+# Disable completion for `.' and `..' special directories
+zstyle ':completion:*' special-dirs false
 
 # Increase the number of errors based on the length of the typed word
 # zstyle -e ':completion:*:approximate:*' max-errors 'reply=($((($#PREFIX+$#SUFFIX)/3))numeric)'
