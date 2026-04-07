@@ -243,9 +243,6 @@ zstyle ':completion:*:*:kill:*:processes' command 'ps -U ${USERNAME} -o pid,user
 zstyle ':completion:*:*:*:*:processes' list-colors '=(#b) #([0-9]##) ([0-9a-z_-]##) *=0=31=36'
 
 ## History
-HISTSIZE=1000000
-SAVEHIST="$HISTSIZE"
-HISTFILE="${HOME}/.zsh_history"
 
 # This option both imports new commands from the history file, and also causes
 # your typed commands to be appended to the history file (the latter is like
@@ -260,13 +257,52 @@ setopt SHARE_HISTORY
 # event).
 setopt HIST_IGNORE_ALL_DUPS
 
+# Do not enter command lines into the history list if they are duplicates of the
+# previous event.
+setopt HIST_IGNORE_DUPS
+
+# Remove command lines from the history list when the first character on the
+# line is a space, or when one of the expanded aliases contains a leading space.
+setopt HIST_IGNORE_SPACE
+
 # Remove superfluous blanks from each command line being added to the history
 # list.
 setopt HIST_REDUCE_BLANKS
 
+# If the internal history needs to be trimmed to add the current command line,
+# setting this option will cause the oldest history event that has a duplicate to
+# be lost before losing a unique event from the list.
+setopt HIST_EXPIRE_DUPS_FIRST
+
 # Save each command's beginning timestamp (in seconds since the epoch) and the
 # duration (in seconds) to the history file.
 setopt EXTENDED_HISTORY
+
+# Exclude some commands from history.
+zshaddhistory() {
+  # Strip trailing newline that zsh always appends to $1
+  local cmd="${1%%$'\n'}"
+
+  # Strip leading whitespace to normalize before checks.
+  # Note: HIST_IGNORE_SPACE will also discard space-prefixed commands at write
+  # time, but we need clean input for accurate length and pattern matching here.
+  local cmd_trim="${cmd##[[:space:]]#}"
+
+  # Discard commands that are too short to be meaningful
+  (( ${#cmd_trim} >= 4 )) || return 1
+
+  # Discard noisy commands not worth keeping
+  [[ $cmd_trim != (ls|ll|la|exa|eza)(\s*.*)# ]] || return 1
+  [[ $cmd_trim != (cd|pwd|exit|clear|reset|fg|bg|jobs|make-all) ]] || return 1
+
+  return 0
+}
+
+# The value of HISTSIZE needs to be a larger number than SAVEHIST for
+# HIST_EXPIRE_DUPS_FIRST to work properly.
+HISTSIZE=2000000
+SAVEHIST=1000000
+HISTFILE="${HOME}/.zsh_history"
 
 ## Prompt
 autoload -Uz colors
