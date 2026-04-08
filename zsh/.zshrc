@@ -1,7 +1,3 @@
-## Ensure uniqueness for path and fpath arrays
-typeset -U path
-typeset -U fpath
-
 ## Helpers
 
 # Print the first existing directory from the given candidates
@@ -38,35 +34,48 @@ function _prepend_fpath {
   done
 }
 
-## Export homebrew environment variables
+## Environment & Path
+
+# Ensure uniqueness for path and fpath arrays
+typeset -U path
+typeset -U fpath
+
+# Homebrew
 if brew=$(_first_exec /usr/local/bin/brew /opt/homebrew/bin/brew); then
   eval "$($brew shellenv)"
 fi
+
 # Default to empty string so ${HOMEBREW_PREFIX}/... expansions are safe on
 # systems without homebrew (e.g. Linux), and set -u won't error on unbound variable
 : "${HOMEBREW_PREFIX:=}"
 
-## Use binaries from homebrew
+# Homebrew binaries
 _prepend_path \
   "${HOMEBREW_PREFIX}/opt/gawk/libexec/gnubin" \
   "${HOMEBREW_PREFIX}/opt/gnu-sed/libexec/gnubin" \
   "${HOMEBREW_PREFIX}/opt/findutils/libexec/gnubin" \
   "${HOMEBREW_PREFIX}/opt/curl/bin"
 
-## Override with my own binaries
+# Personal binaries
 _prepend_path \
   "${HOME}/bin" \
   "${HOME}/Library/Mobile Documents/com~apple~CloudDocs/bin"
 
-## zsh-autosuggestions
+# Additional completion functions
+_prepend_fpath \
+  "${HOME}/.nix-profile/share/zsh/site-functions" \
+  "${HOMEBREW_PREFIX}/share/zsh-completions"
+
+## Plugins
+
+# zsh-autosuggestions
 if dir=$(_first_dir \
            "${HOME}/.nix-profile/share/zsh-autosuggestions" \
            "${HOMEBREW_PREFIX}/share/zsh-autosuggestions"); then
   source "${dir}/zsh-autosuggestions.zsh"
 fi
 
-
-## zsh-fast-syntax-highlighting
+# zsh-fast-syntax-highlighting
 if dir=$(_first_dir \
            "${HOME}/.nix-profile/share/zsh/plugins/fast-syntax-highlighting" \
            "${HOMEBREW_PREFIX}/share/zsh-fast-syntax-highlighting"); then
@@ -80,21 +89,22 @@ elif dir=$(_first_dir \
   export ZSH_HIGHLIGHT_STYLES[comment]='fg=245'
 fi
 
-## zsh-completions
-_prepend_fpath \
-  "${HOME}/.nix-profile/share/zsh/site-functions" \
-  "${HOMEBREW_PREFIX}/share/zsh-completions"
-
 ## fzf
+
 if exe=$(_first_exec \
            "${HOME}/.nix-profile/bin/fzf" \
            "${HOMEBREW_PREFIX}/bin/fzf"); then
+
   export FZF_DEFAULT_OPTS="--height 40% \
---layout reverse \
---border top \
---wrap \
---highlight-line \
---bind \
+    --layout reverse \
+    --border top \
+    --wrap \
+    --highlight-line \
+    --preview 'echo {}' \
+    --preview-window hidden,wrap \
+    --color 'hl:underline:yellow,hl+:underline:yellow:bold' \
+    --bind \
+alt-.:toggle-preview,\
 ctrl-a:beginning-of-line,\
 ctrl-e:end-of-line,\
 ctrl-f:forward-char,\
@@ -110,28 +120,21 @@ alt-f:forward-word,\
 alt-b:backward-word,\
 alt-d:kill-word,\
 alt-bs:backward-kill-word"
+
   export FZF_CTRL_R_OPTS="--wrap-sign '"$'\t'"↳ ' \
---exact \
---no-sort \
---preview 'echo {}' \
---preview-window hidden,wrap \
---bind 'alt-.:toggle-preview' \
---color 'hl:underline:yellow,hl+:underline:yellow:bold'"
+    --exact \
+    --no-sort"
 
   source <("$exe" --zsh)
 fi
 
-# Export LS_COLORS
+## Completion
+
+# Export LS_COLORS (used by completion list-colors below)
 if exe=$(_first_exec "${HOMEBREW_PREFIX}/bin/gdircolors" /usr/bin/dircolors); then
   eval "$($exe -b)"
 fi
 
-# Enable colored menu and scrolling completion in completion listings
-# This needs to be loaded before calling compinit.
-# http://zsh.sourceforge.net/Doc/Release/Zsh-Modules.html#The-zsh_002fcomplist-Module
-zmodload -i zsh/complist
-
-## Completion
 autoload -Uz compinit
 
 # Speed up zsh compinit by only checking cache once a day
@@ -157,6 +160,7 @@ autoload -Uz compinit
 #   hours.
 # https://gist.github.com/ctechols/ca1035271ad134841284#gistcomment-3109177
 ZSH_COMPDUMP=${ZDOTDIR:-$HOME}/.zcompdump
+
 # `() { }` is a zsh anonymous function, not a subshell. shellcheck does not
 # support zsh and misparses it as bash, triggering SC1072/SC1073.
 # shellcheck disable=SC1072,SC1073
@@ -185,6 +189,7 @@ setopt GLOB_DOTS
 if dir=$(_first_dir \
            "${HOME}/.nix-profile/share/fzf-tab" \
            "${HOMEBREW_PREFIX}/share/fzf-tab"); then
+
   source "${dir}/fzf-tab.zsh"
 
   # To make fzf-tab follow FZF_DEFAULT_OPTS.
@@ -199,6 +204,10 @@ if dir=$(_first_dir \
   zstyle ':completion:*' menu no
 
 else
+  # Native zsh completion UI — only needed when fzf-tab is absent.
+  # complist provides menuselect keymap and colored completion listings.
+  zmodload -i zsh/complist
+
   # When listing files that are possible completions, show the type of each file
   # with a trailing identifying mark, like the -F option to ls.
   setopt LIST_TYPES
@@ -229,7 +238,6 @@ else
 
   # Enable scrolling through a completion list
   zstyle ':completion:*:default' list-prompt ''
-
 fi
 
 # Display lists of matches for files in different colours depending on the file
@@ -239,9 +247,8 @@ zstyle ':completion:*' list-colors ${(s.:.)LS_COLORS}
 # Disable completion for `.' and `..' special directories
 zstyle ':completion:*' special-dirs false
 
-# Increase the number of errors based on the length of the typed word
-# zstyle -e ':completion:*:approximate:*' max-errors 'reply=($((($#PREFIX+$#SUFFIX)/3))numeric)'
-zstyle ':completion:*' max-errors 0
+# Allow up to 1 typo for approximate completion
+zstyle ':completion:*' max-errors 1
 
 # Ignore shell functions that should not be used individually
 zstyle ':completion:*:functions' ignored-patterns '_*'
@@ -250,10 +257,10 @@ zstyle ':completion:*:functions' ignored-patterns '_*'
 zstyle ':completion:*:*:*:users' ignored-patterns '_*'
 
 # Ignore backup files when completing commands
-zstyle ':completion:*:complete:-command-::commands' ignored-patterns '*\~'
+zstyle ':completion:*:complete:-command-::commands' ignored-patterns '*~'
 
 # Kill command completion
-zstyle ':completion:*:*:kill:*:processes' command 'ps -U ${USERNAME} -o pid,user,command | sed "/ps -U '${USERNAME}'/d"'
+zstyle ':completion:*:*:kill:*:processes' command 'ps -U ${USERNAME} -o pid,user,command | sed "/ps -U '\''${USERNAME}'\''/d"'
 
 # Colorize kill completion menu
 zstyle ':completion:*:*:*:*:processes' list-colors '=(#b) #([0-9]##) ([0-9a-z_-]##) *=0=31=36'
@@ -270,12 +277,8 @@ setopt SHARE_HISTORY
 
 # If a new command line being added to the history list duplicates an older one,
 # the older command is removed from the list (even if it is not the previous
-# event).
+# event). This is a superset of HIST_IGNORE_DUPS, so the latter is not needed.
 setopt HIST_IGNORE_ALL_DUPS
-
-# Do not enter command lines into the history list if they are duplicates of the
-# previous event.
-setopt HIST_IGNORE_DUPS
 
 # Remove command lines from the history list when the first character on the
 # line is a space, or when one of the expanded aliases contains a leading space.
@@ -308,8 +311,11 @@ zshaddhistory() {
   (( ${#cmd_trim} >= 4 )) || return 1
 
   # Discard noisy commands not worth keeping
-  [[ $cmd_trim != (ls|ll|la|exa|eza)(\s*.*)# ]] || return 1
+  [[ $cmd_trim != (ls|ll|la|exa|eza)(\ *)# ]] || return 1
   [[ $cmd_trim != (cd|pwd|exit|clear|reset|fg|bg|jobs|make-all) ]] || return 1
+
+  # Discard lookup commands — easy to re-type, clutter history
+  [[ $cmd_trim != (man|which|type|where|whence)\ * ]] || return 1
 
   return 0
 }
@@ -321,8 +327,6 @@ SAVEHIST=1000000
 HISTFILE="${HOME}/.zsh_history"
 
 ## Prompt
-autoload -Uz colors
-colors
 
 # Allow dynamic command prompt
 # Substitutions within prompts do not affect the command status.
@@ -355,9 +359,7 @@ zstyle ':vcs_info:git:*' actionformats ' %F{cyan}%b|%a%f'
 PROMPT='%B%F{green}%m%f %F{blue}%~%f${vcs_info_msg_0_} %#%b '
 #RPROMPT=' %B%D{%H:%M:%S.%.}%b'
 
-## MISC
-# Report command running time if its user/system takes longer than 10 seconds
-# REPORTTIME=10
+## Shell Options
 
 # Try to correct the spelling of all arguments in a line.
 # The shell variable CORRECT_IGNORE_FILE may be set to a pattern to match file
@@ -371,37 +373,41 @@ setopt NO_FLOW_CONTROL
 # Allow comments even in interactive shells
 setopt INTERACTIVE_COMMENTS
 
-## Terminal titles
+## Terminal
+
+# Terminal titles
 # https://wiki.archlinux.org/title/zsh#xterm_title
 # For expansion definition:
 # https://zsh.sourceforge.io/Doc/Release/Prompt-Expansion.html#Prompt-Expansion
-function xterm_title {
-  print -Pn -- '\e]2;%m: %~\a'
-}
-
+function xterm_title { print -Pn -- '\e]2;%m: %~\a' }
 add-zsh-hook precmd xterm_title
+
+# Use steady block cursor, and restore it after programs that change cursor
+# shape (e.g. vim with mode-dependent cursors).
+function reset_cursor { echo -ne '\e[2 q' }
+add-zsh-hook precmd reset_cursor
 
 # Disable the suspend keybinding (Ctrl-Z)
 stty susp undef
 
-# Use steady block cursor
-echo -ne '\e[2 q'
+# Configure pinentry to use the correct TTY
+export GPG_TTY=$TTY
 
-## Use less as terminal pager
+## Pager
+
 export PAGER=less
 export LESS='--ignore-case --LONG-PROMPT --RAW-CONTROL-CHARS --window=-4'
 export LESS_TERMCAP_so=$'\e[33m\e[7m'
 export LESS_TERMCAP_se=$'\e[0m'
 
-# Configure pinentry to use the correct TTY
-export GPG_TTY=$TTY
-
 ## Aliases
+
 case $OSTYPE in
   *linux*)
     alias ls='ls --color=auto --group-directories-first' ;;
   *darwin*)
-    case $(which ls 2> /dev/null) in
+    # Use `command -v` instead of `which` — POSIX-compliant and faster
+    case $(command -v ls) in
       *gnubin*)
         alias ls='ls --color=auto --group-directories-first' ;;
       *)
@@ -417,16 +423,17 @@ alias ll='ls -lahF'
 alias lt='ll -rt'
 
 alias grep='grep --color=auto'
-alias fgrep='fgrep --color=auto'
-alias egrep='egrep --color=auto'
+# fgrep/egrep are deprecated; use grep -F/-E instead
+alias fgrep='grep -F --color=auto'
+alias egrep='grep -E --color=auto'
 
 alias rm='rm -i'
 alias cp='cp -i'
 alias mv='mv -i'
-
 alias history='history -i 0'
 
-## Additional customization
+## Custom
+
 if [[ -f ~/.zsh_custom ]]; then
   . ~/.zsh_custom
 fi
