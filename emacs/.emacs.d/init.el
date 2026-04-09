@@ -195,7 +195,6 @@ MAX-HEIGHT-FRACTION is the maximum height as a fraction of the frame height
   (delete-by-moving-to-trash t)
 
   ;; src/minibuffer.c
-  (context-menu-mode t)
   (enable-recursive-minibuffers t)
   (history-delete-duplicates t)
   (minibuffer-prompt-properties
@@ -481,13 +480,17 @@ MAX-HEIGHT-FRACTION is the maximum height as a fraction of the frame height
          ;; Inside tmux: read from the tmux paste buffer.
          ((getenv "TMUX")
           (lambda ()
-            (let ((text (shell-command-to-string "tmux save-buffer -")))
+            (let ((text (with-output-to-string
+                          (with-current-buffer standard-output
+                            (call-process "tmux" nil t nil "save-buffer" "-")))))
               (unless (string-empty-p text) text))))
          ;; Outside tmux: read from X11 clipboard via xsel.
          ;; Over SSH without X forwarding, xsel fails and returns "".
          ((executable-find "xsel")
           (lambda ()
-            (let ((text (shell-command-to-string "xsel -ob 2>/dev/null")))
+            (let ((text (with-output-to-string
+                          (with-current-buffer standard-output
+                            (call-process "xsel" nil t nil "-ob")))))
               (unless (string-empty-p text) text)))))))
 
 
@@ -812,8 +815,8 @@ MAX-HEIGHT-FRACTION is the maximum height as a fraction of the frame height
 ;; TODO: Emacs 31 may not need this.
 (use-package corfu-terminal
   :ensure t
-  :unless (and (< emacs-major-version 31)
-               (display-graphic-p))
+  :if (and (< emacs-major-version 31)
+           (not (display-graphic-p)))
   :after corfu
   :demand t
   :config
@@ -1100,8 +1103,8 @@ this is effective with some expand functions, eg.,
   (define-ibuffer-column size-h
     (:name "Size" :inline t)
     (cond
-     ((> (buffer-size) 1000) (format "%7.3fK" (/ (buffer-size) 1024.0)))
      ((> (buffer-size) 1000000) (format "%7.3fM" (/ (buffer-size) 1048576.0)))
+     ((> (buffer-size) 1000) (format "%7.3fK" (/ (buffer-size) 1024.0)))
      (t (format "%8d" (buffer-size))))))
 
 
@@ -1116,14 +1119,10 @@ this is effective with some expand functions, eg.,
   :preface
   ;; https://github.com/jwiegley/dot-emacs/blob/master/init.el
   (defun recentf-add-dired-directory ()
-    (if (and dired-directory
-             (file-directory-p dired-directory)
-             (not (string= "/" dired-directory)))
-        (let ((last-idx (1- (length dired-directory))))
-          (recentf-add-file
-           (if (= ?/ (aref dired-directory last-idx))
-               (substring dired-directory 0 last-idx)
-             dired-directory)))))
+    (when (and dired-directory
+               (file-directory-p dired-directory)
+               (not (string= "/" dired-directory)))
+      (recentf-add-file (directory-file-name dired-directory))))
 
   :custom
   (recentf-auto-cleanup 60)
@@ -1228,8 +1227,6 @@ this is effective with some expand functions, eg.,
 (use-package eldoc
   :defer 2
   :diminish
-  :hook
-  (prog-mode . global-eldoc-mode)
   :config
   (global-eldoc-mode t))
 
@@ -1238,8 +1235,6 @@ this is effective with some expand functions, eg.,
   :defer 2
   :custom
   (which-func-unknown "n/a")
-  :hook
-  (prog-mode . which-function-mode)
   :config
   (which-function-mode t))
 
