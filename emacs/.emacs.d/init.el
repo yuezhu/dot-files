@@ -428,8 +428,8 @@ MAX-HEIGHT-FRACTION is the maximum height as a fraction of the frame height
   :if (memq window-system '(mac ns))
   :demand t
   :custom
-  (mac-command-modifier 'meta)
-  (mac-option-modifier 'super)
+  ;; (mac-command-modifier 'meta)
+  ;; (mac-option-modifier 'super)
   (ns-pop-up-frames nil))
 
 
