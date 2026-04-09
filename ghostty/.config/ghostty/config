@@ -1,9 +1,13 @@
 theme = Modus Vivendi
 
+macos-titlebar-style = tabs
+
+window-colorspace = display-p3
+
 font-thicken = true
-font-thicken-strength = 0
-font-family = Menlo
-font-size = 14.5
+font-thicken-strength = 31
+font-family = SF Mono
+font-size = 14
 
 cursor-style = block
 cursor-style-blink = false
