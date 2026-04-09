@@ -2029,6 +2029,11 @@ This only affects the current markdown buffer, and does not add the
    '((string-match "^\\s-+$" (thing-at-point 'line)))))
 
 
+(use-package rainbow-mode
+  :ensure t
+  :defer t)
+
+
 (use-package rainbow-delimiters
   :ensure t
   :defer t
