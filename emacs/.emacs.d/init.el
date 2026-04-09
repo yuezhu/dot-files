@@ -1,5 +1,7 @@
 ;;; init.el --- ... -*- lexical-binding: t -*-
 
+;;; Startup & Performance
+
 ;; Used to report time spent loading this module
 (defconst emacs-start-time (current-time))
 
@@ -99,9 +101,8 @@ MAX-HEIGHT-FRACTION is the maximum height as a fraction of the frame height
                         min-height-lines))
 
 
-;;
-;; Initialize ELPA
-;;
+;;; Package Management
+
 (require 'package)
 
 ;; Some packages are built into Emacs, but I want to use ELPA versions.
@@ -145,6 +146,8 @@ MAX-HEIGHT-FRACTION is the maximum height as a fraction of the frame height
   :ensure t
   :defer t)
 
+
+;;; Core Emacs Settings
 
 ;; (use-package emacs ...) is a common idiom for configuring built-in
 ;; Emacs settings that don't belong to any specific package.  Since
@@ -284,44 +287,154 @@ MAX-HEIGHT-FRACTION is the maximum height as a fraction of the frame height
             #'executable-make-buffer-file-executable-if-script-p))
 
 
-;; Loaded in loadup.el
-(use-package window
+(use-package warnings
+  :defer t
   :custom
-  (scroll-error-top-bottom t))
+  (warning-minimum-level :error))
 
 
-;; Loaded in loadup.el
-(use-package isearch
-  :bind (:map isearch-mode-map
-              ;; DEL during isearch should edit the search string, not jump
-              ;; back to the previous result
-              ;; https://github.com/purcell/emacs.d/blob/b484cada4356803d0ecb063d33546835f996fefe/lisp/init-isearch.el#L14
-              ([remap isearch-delete-char] . isearch-del-char))
+(use-package delsel
+  :defer t
   :custom
-  (isearch-allow-scroll t)
-  (search-highlight t))
+  (delete-selection-mode t))
 
 
-;; Loaded in loadup.el
-(use-package replace
+(use-package cus-edit
+  :defer t
+  :init
+  (setq custom-file (expand-file-name "custom.el"
+                                      user-emacs-directory)
+        custom-buffer-done-kill t))
+
+
+(use-package image-file
+  :defer t
   :custom
-  (list-matching-lines-default-context-lines 3)
-  (query-replace-highlight t))
+  (auto-image-file-mode t))
 
 
-;; Loaded in loadup.el
-(use-package select
+(use-package subword
+  :defer t
+  :diminish
   :custom
-  (select-enable-clipboard t))
+  (global-subword-mode t))
 
 
-;; Loaded in loadup.el
-(use-package uniquify
+(use-package autorevert
+  :defer 2
   :custom
-  (uniquify-after-kill-buffer-p t)
-  (uniquify-buffer-name-style
-   'post-forward-angle-brackets nil (uniquify)))
+  (global-auto-revert-non-file-buffers t)
+  :config
+  (global-auto-revert-mode t))
 
+
+(use-package time
+  :defer 2
+  :config
+  (display-time-mode t))
+
+
+(use-package so-long
+  :defer 2
+  :config
+  (global-so-long-mode t))
+
+
+(use-package repeat
+  :defer t
+  :custom
+  (repeat-exit-key [return])
+  (repeat-mode t))
+
+
+(use-package midnight
+  :disabled ;; 2023-07-31 not used
+  :defer 2
+  :config
+  (midnight-mode))
+
+
+(use-package calendar
+  :defer t
+  :config
+  (add-to-list 'display-buffer-alist
+               '("\\`\\*Calendar\\*\\'"
+                 (display-buffer-at-bottom)
+                 (inhibit-same-window . t))))
+
+
+;;; User Interface
+
+(use-package hl-line
+  :defer t
+  :hook
+  ((compilation-mode
+    gnus-mode
+    ibuffer-mode
+    magit-mode
+    occur-mode
+    dired-mode)
+   . hl-line-mode))
+
+
+(use-package goto-addr
+  :defer t
+  :hook
+  (prog-mode . goto-address-prog-mode)
+  :hook
+  ((text-mode magit-process-mode) . goto-address-mode))
+
+
+(use-package display-fill-column-indicator
+  :defer t
+  ;; :hook
+  ;; (auto-fill-mode
+  ;;  . (lambda ()
+  ;;      (display-fill-column-indicator-mode
+  ;;       (if auto-fill-function 1 -1))))
+  )
+
+
+(use-package display-line-numbers
+  :defer t
+  :hook diff-mode)
+
+
+(use-package paren
+  :defer t
+  :custom
+  (show-paren-mode t)
+  (show-paren-delay 0)
+  (show-paren-style 'parentheses))
+
+
+(use-package which-key
+  :defer 2
+  :diminish
+  :config
+  (which-key-mode))
+
+
+;;; macOS Integration
+
+(use-package exec-path-from-shell
+  :if (memq window-system '(mac ns))
+  :ensure t
+  :demand t
+  :config
+  (exec-path-from-shell-initialize))
+
+
+(use-package ns-win
+  :if (memq window-system '(mac ns))
+  :demand t
+  :custom
+  (mac-command-modifier 'meta)
+  (mac-option-modifier 'super)
+  (ns-pop-up-frames nil))
+
+
+;;; Terminal Support
 
 (use-package mwheel
   :if (display-graphic-p)
@@ -378,171 +491,18 @@ MAX-HEIGHT-FRACTION is the maximum height as a fraction of the frame height
               (unless (string-empty-p text) text)))))))
 
 
-(use-package warnings
-  :defer t
+;; Use a heavier box-drawing character for the vertical window border
+;; in terminal Emacs, where faces cannot style the border.
+(unless (display-graphic-p)
+  (set-display-table-slot standard-display-table 'vertical-border ?┃))
+
+
+;;; Window Management
+
+;; Loaded in loadup.el
+(use-package window
   :custom
-  (warning-minimum-level :error))
-
-
-(use-package delsel
-  :defer t
-  :custom
-  (delete-selection-mode t))
-
-
-(use-package cus-edit
-  :defer t
-  :init
-  (setq custom-file (expand-file-name "custom.el"
-                                      user-emacs-directory)
-        custom-buffer-done-kill t))
-
-
-(use-package image-file
-  :defer t
-  :custom
-  (auto-image-file-mode t))
-
-
-(use-package hl-line
-  :defer t
-  :hook
-  ((compilation-mode
-    gnus-mode
-    ibuffer-mode
-    magit-mode
-    occur-mode
-    dired-mode)
-   . hl-line-mode))
-
-
-(use-package goto-addr
-  :defer t
-  :hook
-  (prog-mode . goto-address-prog-mode)
-  :hook
-  ((text-mode magit-process-mode) . goto-address-mode))
-
-
-(use-package display-fill-column-indicator
-  :defer t
-  ;; :hook
-  ;; (auto-fill-mode
-  ;;  . (lambda ()
-  ;;      (display-fill-column-indicator-mode
-  ;;       (if auto-fill-function 1 -1))))
-  )
-
-
-(use-package display-line-numbers
-  :defer t
-  :hook diff-mode)
-
-
-(use-package subword
-  :defer t
-  :diminish
-  :custom
-  (global-subword-mode t))
-
-
-(use-package xref
-  :defer t
-  :custom
-  (xref-prompt-for-identifier nil)
-  (xref-search-program 'ripgrep)
-  (xref-ripgrep-extra-arguments '("--follow")) ;; follow symlinks
-  :config
-  ;; Use ripgrep for `xref-find-references' when no LSP is active.
-  ;; The default method uses semantic-symref (CScope/Global), and dumb-jump
-  ;; has its own method that often fails. Override both with ripgrep search.
-  ;; Eglot's (eql 'eglot) method is more specific and still takes precedence.
-  (defun xref--ripgrep-references (identifier)
-    (xref-matches-in-files (regexp-quote identifier)
-                           (project-files (project-current t))))
-  (cl-defmethod xref-backend-references (_backend identifier)
-    (xref--ripgrep-references identifier)))
-
-
-(use-package autorevert
-  :defer 2
-  :custom
-  (global-auto-revert-non-file-buffers t)
-  :config
-  (global-auto-revert-mode t))
-
-
-(use-package time
-  :defer 2
-  :config
-  (display-time-mode t))
-
-
-(use-package so-long
-  :defer 2
-  :config
-  (global-so-long-mode t))
-
-
-(use-package eldoc
-  :defer 2
-  :diminish
-  :hook
-  (prog-mode . global-eldoc-mode)
-  :config
-  (global-eldoc-mode t))
-
-
-(use-package which-func
-  :defer 2
-  :custom
-  (which-func-unknown "n/a")
-  :hook
-  (prog-mode . which-function-mode)
-  :config
-  (which-function-mode t))
-
-
-(use-package electric
-  :defer t
-  :custom
-  (electric-indent-mode t))
-
-
-(use-package elec-pair
-  :defer t
-  :custom
-  (electric-pair-mode t))
-
-
-(use-package ediff-wind
-  :defer t
-  :custom
-  (ediff-split-window-function 'split-window-horizontally)
-  (ediff-window-setup-function 'ediff-setup-windows-plain))
-
-
-(use-package ialign
-  :ensure t
-  :defer t
-  :bind ("C-c |" . ialign))
-
-
-(use-package exec-path-from-shell
-  :if (memq window-system '(mac ns))
-  :ensure t
-  :demand t
-  :config
-  (exec-path-from-shell-initialize))
-
-
-(use-package ns-win
-  :if (memq window-system '(mac ns))
-  :demand t
-  :custom
-  (mac-command-modifier 'meta)
-  (mac-option-modifier 'super)
-  (ns-pop-up-frames nil))
+  (scroll-error-top-bottom t))
 
 
 (use-package winner
@@ -572,464 +532,18 @@ MAX-HEIGHT-FRACTION is the maximum height as a fraction of the frame height
   (winner-mode))
 
 
-(use-package midnight
-  :disabled ;; 2023-07-31 not used
-  :defer 2
-  :config
-  (midnight-mode))
-
-
-(use-package repeat
-  :defer t
-  :custom
-  (repeat-exit-key [return])
-  (repeat-mode t))
-
-
-(use-package paren
-  :defer t
-  :custom
-  (show-paren-mode t)
-  (show-paren-delay 0)
-  (show-paren-style 'parentheses))
-
-
-(use-package calendar
-  :defer t
-  :config
-  (add-to-list 'display-buffer-alist
-               '("\\`\\*Calendar\\*\\'"
-                 (display-buffer-at-bottom)
-                 (inhibit-same-window . t))))
-
-
-(use-package recentf
-  :defer 2
-  :preface
-  ;; https://github.com/jwiegley/dot-emacs/blob/master/init.el
-  (defun recentf-add-dired-directory ()
-    (if (and dired-directory
-             (file-directory-p dired-directory)
-             (not (string= "/" dired-directory)))
-        (let ((last-idx (1- (length dired-directory))))
-          (recentf-add-file
-           (if (= ?/ (aref dired-directory last-idx))
-               (substring dired-directory 0 last-idx)
-             dired-directory)))))
-
-  :custom
-  (recentf-auto-cleanup 60)
-  (recentf-exclude
-   '("\\`out\\'"
-     "\\.log\\'"
-     "\\.el\\.gz\\'"
-     "/\\.emacs\\.d/elpa/.*-\\(autoloads\\|pkg\\)\\.el\\'"
-     "/\\.emacs\\.d/\\(auto-save-list\\|projects\\|recentf\\|snippets\\|tramp\\|var\\)"
-     "/\\.git/COMMIT_EDITMSG\\'"))
-  (recentf-filename-handlers '(abbreviate-file-name))
-  (recentf-max-saved-items 2000)
-
-  :hook
-  (dired-mode . recentf-add-dired-directory)
-
-  :commands (recentf-mode
-             recentf-add-file
-             recentf-save-list
-             recentf-string-member)
-
-  :config
-  (let ((inhibit-message t))
-    (recentf-mode 1))
-
-  (advice-add 'recentf-cleanup :around
-              (lambda (func &rest args)
-                "Do not print to the echo area when cleaning up
-`recentf-list'."
-                (let ((inhibit-message t))
-                  (apply func args)))))
-
-
-(use-package whitespace
-  :defer t
-  :bind (("C-c w m" . whitespace-mode)
-         ("C-c w r" . whitespace-report)
-         ("C-c w c" . whitespace-cleanup))
-
-  :diminish (global-whitespace-mode
-             whitespace-mode
-             whitespace-newline-mode)
-
-  :hook ((conf-mode
-          json-mode
-          ssh-config-mode
-          yaml-mode
-          makefile-mode)
-         . whitespace-mode)
-
-  :custom
-  (whitespace-line-column 100)
-  (whitespace-style '(face trailing tabs)))
-
-
-(use-package ispell
-  :defer t
-
-  :custom
-  (ispell-program-name "hunspell")
-  (ispell-personal-dictionary "~/.emacs.d/ispell-personal-dictionary")
-  (ispell-silently-savep t)
-  (ispell-local-dictionary-alist
-   '(("en_US"
-      "[[:alpha:]]" "[^[:alpha:]]" "[']" nil
-      ("-d" "en_US") nil utf-8)))
-  (ispell-local-dictionary "en_US")
-
-  :config
-  ;; Hunspell cannot create the personal dictionary file if it does not exist.
-  (unless (file-exists-p ispell-personal-dictionary)
-    (make-empty-file ispell-personal-dictionary)))
-
-
-(use-package flyspell
-  :defer t
-  :bind ("C-c s b" . flyspell-buffer)
-
-  :preface
-  ;; https://github.com/abo-abo/oremacs/blob/github/modes/ora-flyspell.el
-  (defun flyspell-ignore-http-and-https ()
-    "Function used for `flyspell-generic-check-word-predicate' to
-ignore stuff starting with \"http\" or \"https\"."
-    (save-excursion
-      (forward-whitespace -1)
-      (not (looking-at "[\t ]+https?\\b"))))
-
-  :hook
-  (text-mode . flyspell-mode)
-
-  :custom
-  (flyspell-sort-corrections t)
-
-  :config
-  (dolist (mode '(text-mode org-mode)) ;; need to specify all derived modes
-    (put mode 'flyspell-mode-predicate #'flyspell-ignore-http-and-https)))
-
-
-(use-package flyspell-correct
-  :ensure t
-  :after flyspell
-  :defer t
-  :bind (:map flyspell-mode-map
-              ("C-c s w" . flyspell-correct-wrapper)))
-
-
-(use-package flymake
-  :defer t
-  :hook (sh-mode . flymake-mode))
-
-
-(use-package flycheck
-  :disabled ;; 2023-08-12 use `flymake'
-  :defer 2
-  :custom
-  (flycheck-disabled-checkers
-   '(c/c++-cppcheck
-     c/c++-gcc
-     go-build
-     go-errcheck
-     go-gofmt
-     go-golint
-     go-staticcheck
-     go-test
-     go-unconvert
-     go-vet
-     json-jsonlint
-     json-python-json
-     python-mypy
-     python-pycompile
-     python-pyright
-     ruby-rubocop
-     sh-bash
-     sh-posix-bash
-     sh-posix-dash
-     sh-zsh
-     yaml-jsyaml
-     yaml-ruby
-     emacs-lisp-checkdoc))
-  :config
-  (global-flycheck-mode 1))
-
-
-(use-package ibuffer
-  :defer t
-
-  :bind ("C-x C-b" . ibuffer)
-
-  :hook
-  (ibuffer-mode . ibuffer-auto-mode)
-  (ibuffer . (lambda ()
-               (ibuffer-vc-set-filter-groups-by-vc-root)
-               (unless (eq ibuffer-sorting-mode 'filename/process)
-                 (ibuffer-do-sort-by-filename/process))))
-
-  :custom
-  (ibuffer-filter-group-name-face 'font-lock-doc-face)
-  (ibuffer-formats '((mark modified read-only vc-status-mini " "
-                           (name 32 32 :left :elide)
-                           " "
-                           (size-h 9 -1 :right)
-                           " "
-                           (mode 16 16 :left :elide)
-                           " "
-                           (vc-status 16 -1 :left)
-                           " " filename-and-process)))
-
-  :config
-  (define-ibuffer-column size-h
-    (:name "Size" :inline t)
-    (cond
-     ((> (buffer-size) 1000) (format "%7.3fK" (/ (buffer-size) 1024.0)))
-     ((> (buffer-size) 1000000) (format "%7.3fM" (/ (buffer-size) 1048576.0)))
-     (t (format "%8d" (buffer-size))))))
-
-
-(use-package ibuffer-vc
-  :ensure t
-  :after ibuffer
-  :demand t)
-
-
-(use-package hideshow
-  :defer t
-  :diminish hs-minor-mode
-  :hook (prog-mode . hs-minor-mode))
-
-
-(use-package diff-hl
+(use-package ace-window
   :ensure t
   :defer t
-
-  :hook ((conf-mode
-          protobuf-mode
-          ssh-config-mode
-          text-mode
-          prog-mode)
-         . diff-hl-mode)
-  (magit-pre-refresh . diff-hl-magit-pre-refresh)
-  (magit-post-refresh . diff-hl-magit-post-refresh)
-
+  :bind ("M-o" . ace-window)
   :custom
-  (diff-hl-draw-borders nil))
+  (aw-scope 'frame)
+  :custom-face
+  (aw-leading-char-face
+   ((t (:inherit aw-leading-char-face :weight bold :height 3.0)))))
 
 
-(use-package tramp-sh
-  :defer t
-
-  :init
-  ;; https://www.gnu.org/software/emacs/manual/html_node/tramp/Frequently-Asked-Questions.html
-  (setq
-   vc-ignore-dir-regexp
-   (format "\\(%s\\)\\|\\(%s\\)"
-           vc-ignore-dir-regexp
-           tramp-file-name-regexp)
-   tramp-connection-timeout 15
-   tramp-default-method "ssh"
-   tramp-use-ssh-controlmaster-options nil))
-
-
-(use-package rg
-  :ensure t
-  :defer t
-  :bind ("C-c r" . rg-menu)
-  :config
-  (add-to-list 'display-buffer-alist
-               '("\\`\\*rg\\*\\'"
-                 (display-buffer-at-bottom)
-                 (inhibit-same-window . t)
-                 (window-height . 0.5))))
-
-
-(use-package wgrep
-  :ensure t
-  :defer t)
-
-
-(use-package dumb-jump
-  :ensure t
-  :defer t
-  :init
-  (add-hook 'xref-backend-functions #'dumb-jump-xref-activate)
-  :custom
-  (dumb-jump-force-searcher 'rg)
-  :config
-  ;; Override dumb-jump's xref-backend-references to use ripgrep via xref.
-  ;; Must be in :config so it runs after dumb-jump defines its own method.
-  (cl-defmethod xref-backend-references ((_backend (eql dumb-jump)) identifier)
-    (xref--ripgrep-references identifier)))
-
-
-(use-package hippie-exp
-  :bind ("M-/" . hippie-expand)
-  :defer t
-  :config
-  (advice-add 'hippie-expand :around
-              (lambda (func &rest args)
-                "Make `hippie-expand' do case-sensitive expanding. Though not all,
-this is effective with some expand functions, eg.,
-`try-expand-all-abbrevs'"
-                (let ((case-fold-search nil))
-                  (apply func args)))))
-
-
-(use-package project
-  :defer t
-  :custom
-  (project-switch-commands 'project-dired))
-
-
-(use-package dired
-  :defer t
-
-  :preface
-  (defun dired-find-directory (dir)
-    (interactive "DFind directory: ")
-    (let ((orig (current-buffer)))
-      (dired dir)
-      (kill-buffer orig)))
-
-  ;; https://github.com/jwiegley/dot-emacs/blob/master/init.el
-  (defun dired-next-window ()
-    (interactive)
-    (let ((next (car (cl-remove-if-not (lambda (wind)
-                                         (with-current-buffer (window-buffer wind)
-                                           (eq major-mode 'dired-mode)))
-                                       (cdr (window-list))))))
-      (when next
-        (select-window next))))
-
-  (defun dired-find-file-reuse-buffer ()
-    "Replace current buffer if file is a directory."
-    (interactive)
-    (let ((orig (current-buffer))
-          (filename (dired-get-file-for-visit)))
-      (dired-find-file)
-      (when (and (file-directory-p filename)
-                 (not (eq (current-buffer) orig)))
-        (kill-buffer orig))))
-
-  (defun dired-up-directory-reuse-buffer ()
-    "Replace current buffer if file is a directory."
-    (interactive)
-    (let ((orig (current-buffer)))
-      (dired-up-directory)
-      (kill-buffer orig)))
-
-  :commands (dired-get-file-for-visit
-             dired-find-file
-             dired-up-directory
-             dired-hide-details-mode)
-
-  :bind (:map dired-mode-map
-              ("/"     . dired-find-directory)
-              ("<tab>" . dired-next-window)
-              ("M-p"   . dired-up-directory-reuse-buffer)
-              ("M-n"   . dired-find-file-reuse-buffer)
-              ("!"     . crux-open-with))
-
-  :hook
-  (dired-mode
-   . (lambda ()
-       ;; (dired-hide-details-mode)
-       (setq-local auto-revert-verbose nil)))
-
-  :custom
-  (insert-directory-program
-   (cond
-    ((and (eq system-type 'darwin)
-          (executable-find "gls"))
-     "gls")
-    ((eq system-type 'darwin)
-     "ls")))
-  (dired-listing-switches
-   (cond
-    ((eq system-type 'gnu/linux)
-     "-Ahl --group-directories-first")
-    ((eq system-type 'darwin)
-     (if (string-suffix-p "gls" insert-directory-program)
-         "-Alh --group-directories-first"
-       "-Ahl"))))
-  (dired-dwim-target t)
-  (dired-isearch-filenames 'dwim)
-  (dired-omit-files "^\\.?#\\|^\\.$\\|^\\.\\.$\\|^\\..+$")
-  (dired-omit-size-limit nil)
-  (dired-omit-verbose nil)
-  (dired-recursive-copies 'always)
-  (dired-recursive-deletes 'always))
-
-
-(use-package diredfl
-  :ensure t
-  :defer t
-  :hook
-  (dired-mode . diredfl-mode))
-
-
-(use-package dired-x
-  :disabled
-  :defer t
-  :hook
-  (dired-mode . dired-omit-mode))
-
-
-(use-package eglot
-  :defer t
-  :custom
-  (eglot-autoshutdown t)
-  (eglot-events-buffer-size 0)
-  ;; (eglot-ignored-server-capabilites
-  ;;  '(:documentHighlightProvider
-  ;;    :codeActionProvider
-  ;;    :codeLensProvider
-  ;;    :documentFormattingProvider
-  ;;    :documentRangeFormattingProvider
-  ;;    :documentOnTypeFormattingProvider
-  ;;    :documentLinkProvider))
-
-  ;; :config
-  ;; (add-to-list 'eglot-stay-out-of 'flymake)
-  )
-
-
-(use-package abbrev
-  :defer t
-  :diminish
-  :hook
-  ;; ((text-mode prog-mode) . abbrev-mode)
-  (expand-load
-   . (lambda ()
-       (add-hook 'expand-expand-hook #'indent-according-to-mode)
-       (add-hook 'expand-jump-hook #'indent-according-to-mode)))
-  :commands abbrev-mode ;; `cc-mode' turns on `abbrev-mode'.
-
-  :custom
-  (save-abbrevs 'silently)
-
-  :config
-  (if (file-exists-p abbrev-file-name)
-      (quietly-read-abbrev-file)))
-
-
-(use-package imenu
-  :defer t
-  :custom
-  (imenu-auto-rescan t)
-  (imenu-auto-rescan-maxout 600000)
-  (imenu-max-item-length "Unlimited"))
-
-
-(use-package crux
-  :ensure t
-  :defer t)
-
+;;; Minibuffer & Completion
 
 (use-package orderless
   :ensure t
@@ -1346,35 +860,87 @@ this is effective with some expand functions, eg.,
   )
 
 
-(use-package copilot
-  :ensure t
+(use-package hippie-exp
+  :bind ("M-/" . hippie-expand)
   :defer t
-  :bind (:map copilot-completion-map
-              ;; I use TAB to trigger `corfu' completion.
-              ;; ("<tab>" . copilot-accept-completion)
-              ;; ("TAB" . copilot-accept-completion)
-              ("C-e" . copilot-accept-completion)
-              ("C-<tab>" . copilot-accept-completion-by-word)
-              ("C-TAB" . copilot-accept-completion-by-word)
-              ("M-n" . copilot-next-completion)
-              ("M-p" . copilot-previous-completion)))
+  :config
+  (advice-add 'hippie-expand :around
+              (lambda (func &rest args)
+                "Make `hippie-expand' do case-sensitive expanding. Though not all,
+this is effective with some expand functions, eg.,
+`try-expand-all-abbrevs'"
+                (let ((case-fold-search nil))
+                  (apply func args)))))
 
 
-(use-package ace-window
-  :ensure t
-  :defer t
-  :bind ("M-o" . ace-window)
+;;; Search & Navigation
+
+;; Loaded in loadup.el
+(use-package isearch
+  :bind (:map isearch-mode-map
+              ;; DEL during isearch should edit the search string, not jump
+              ;; back to the previous result
+              ;; https://github.com/purcell/emacs.d/blob/b484cada4356803d0ecb063d33546835f996fefe/lisp/init-isearch.el#L14
+              ([remap isearch-delete-char] . isearch-del-char))
   :custom
-  (aw-scope 'frame)
-  :custom-face
-  (aw-leading-char-face
-   ((t (:inherit aw-leading-char-face :weight bold :height 3.0)))))
+  (isearch-allow-scroll t)
+  (search-highlight t))
 
 
-(use-package ace-link
+;; Loaded in loadup.el
+(use-package replace
+  :custom
+  (list-matching-lines-default-context-lines 3)
+  (query-replace-highlight t))
+
+
+(use-package xref
+  :defer t
+  :custom
+  (xref-prompt-for-identifier nil)
+  (xref-search-program 'ripgrep)
+  (xref-ripgrep-extra-arguments '("--follow")) ;; follow symlinks
+  :config
+  ;; Use ripgrep for `xref-find-references' when no LSP is active.
+  ;; The default method uses semantic-symref (CScope/Global), and dumb-jump
+  ;; has its own method that often fails. Override both with ripgrep search.
+  ;; Eglot's (eql 'eglot) method is more specific and still takes precedence.
+  (defun xref--ripgrep-references (identifier)
+    (xref-matches-in-files (regexp-quote identifier)
+                           (project-files (project-current t))))
+  (cl-defmethod xref-backend-references (_backend identifier)
+    (xref--ripgrep-references identifier)))
+
+
+(use-package rg
   :ensure t
   :defer t
-  :bind ("C-c j a" . ace-link-addr))
+  :bind ("C-c r" . rg-menu)
+  :config
+  (add-to-list 'display-buffer-alist
+               '("\\`\\*rg\\*\\'"
+                 (display-buffer-at-bottom)
+                 (inhibit-same-window . t)
+                 (window-height . 0.5))))
+
+
+(use-package wgrep
+  :ensure t
+  :defer t)
+
+
+(use-package dumb-jump
+  :ensure t
+  :defer t
+  :init
+  (add-hook 'xref-backend-functions #'dumb-jump-xref-activate)
+  :custom
+  (dumb-jump-force-searcher 'rg)
+  :config
+  ;; Override dumb-jump's xref-backend-references to use ripgrep via xref.
+  ;; Must be in :config so it runs after dumb-jump defines its own method.
+  (cl-defmethod xref-backend-references ((_backend (eql dumb-jump)) identifier)
+    (xref--ripgrep-references identifier)))
 
 
 (use-package avy
@@ -1389,6 +955,494 @@ this is effective with some expand functions, eg.,
   :custom
   (avy-case-fold-search t))
 
+
+(use-package ace-link
+  :ensure t
+  :defer t
+  :bind ("C-c j a" . ace-link-addr))
+
+
+(use-package imenu
+  :defer t
+  :custom
+  (imenu-auto-rescan t)
+  (imenu-auto-rescan-maxout 600000)
+  (imenu-max-item-length "Unlimited"))
+
+
+(use-package project
+  :defer t
+  :custom
+  (project-switch-commands 'project-dired))
+
+
+;;; File & Buffer Management
+
+(use-package dired
+  :defer t
+
+  :preface
+  (defun dired-find-directory (dir)
+    (interactive "DFind directory: ")
+    (let ((orig (current-buffer)))
+      (dired dir)
+      (kill-buffer orig)))
+
+  ;; https://github.com/jwiegley/dot-emacs/blob/master/init.el
+  (defun dired-next-window ()
+    (interactive)
+    (let ((next (car (cl-remove-if-not (lambda (wind)
+                                         (with-current-buffer (window-buffer wind)
+                                           (eq major-mode 'dired-mode)))
+                                       (cdr (window-list))))))
+      (when next
+        (select-window next))))
+
+  (defun dired-find-file-reuse-buffer ()
+    "Replace current buffer if file is a directory."
+    (interactive)
+    (let ((orig (current-buffer))
+          (filename (dired-get-file-for-visit)))
+      (dired-find-file)
+      (when (and (file-directory-p filename)
+                 (not (eq (current-buffer) orig)))
+        (kill-buffer orig))))
+
+  (defun dired-up-directory-reuse-buffer ()
+    "Replace current buffer if file is a directory."
+    (interactive)
+    (let ((orig (current-buffer)))
+      (dired-up-directory)
+      (kill-buffer orig)))
+
+  :commands (dired-get-file-for-visit
+             dired-find-file
+             dired-up-directory
+             dired-hide-details-mode)
+
+  :bind (:map dired-mode-map
+              ("/"     . dired-find-directory)
+              ("<tab>" . dired-next-window)
+              ("M-p"   . dired-up-directory-reuse-buffer)
+              ("M-n"   . dired-find-file-reuse-buffer)
+              ("!"     . crux-open-with))
+
+  :hook
+  (dired-mode
+   . (lambda ()
+       ;; (dired-hide-details-mode)
+       (setq-local auto-revert-verbose nil)))
+
+  :custom
+  (insert-directory-program
+   (cond
+    ((and (eq system-type 'darwin)
+          (executable-find "gls"))
+     "gls")
+    ((eq system-type 'darwin)
+     "ls")))
+  (dired-listing-switches
+   (cond
+    ((eq system-type 'gnu/linux)
+     "-Ahl --group-directories-first")
+    ((eq system-type 'darwin)
+     (if (string-suffix-p "gls" insert-directory-program)
+         "-Alh --group-directories-first"
+       "-Ahl"))))
+  (dired-dwim-target t)
+  (dired-isearch-filenames 'dwim)
+  (dired-omit-files "^\\.?#\\|^\\.$\\|^\\.\\.$\\|^\\..+$")
+  (dired-omit-size-limit nil)
+  (dired-omit-verbose nil)
+  (dired-recursive-copies 'always)
+  (dired-recursive-deletes 'always))
+
+
+(use-package diredfl
+  :ensure t
+  :defer t
+  :hook
+  (dired-mode . diredfl-mode))
+
+
+(use-package dired-x
+  :disabled
+  :defer t
+  :hook
+  (dired-mode . dired-omit-mode))
+
+
+(use-package ibuffer
+  :defer t
+
+  :bind ("C-x C-b" . ibuffer)
+
+  :hook
+  (ibuffer-mode . ibuffer-auto-mode)
+  (ibuffer . (lambda ()
+               (ibuffer-vc-set-filter-groups-by-vc-root)
+               (unless (eq ibuffer-sorting-mode 'filename/process)
+                 (ibuffer-do-sort-by-filename/process))))
+
+  :custom
+  (ibuffer-filter-group-name-face 'font-lock-doc-face)
+  (ibuffer-formats '((mark modified read-only vc-status-mini " "
+                           (name 32 32 :left :elide)
+                           " "
+                           (size-h 9 -1 :right)
+                           " "
+                           (mode 16 16 :left :elide)
+                           " "
+                           (vc-status 16 -1 :left)
+                           " " filename-and-process)))
+
+  :config
+  (define-ibuffer-column size-h
+    (:name "Size" :inline t)
+    (cond
+     ((> (buffer-size) 1000) (format "%7.3fK" (/ (buffer-size) 1024.0)))
+     ((> (buffer-size) 1000000) (format "%7.3fM" (/ (buffer-size) 1048576.0)))
+     (t (format "%8d" (buffer-size))))))
+
+
+(use-package ibuffer-vc
+  :ensure t
+  :after ibuffer
+  :demand t)
+
+
+(use-package recentf
+  :defer 2
+  :preface
+  ;; https://github.com/jwiegley/dot-emacs/blob/master/init.el
+  (defun recentf-add-dired-directory ()
+    (if (and dired-directory
+             (file-directory-p dired-directory)
+             (not (string= "/" dired-directory)))
+        (let ((last-idx (1- (length dired-directory))))
+          (recentf-add-file
+           (if (= ?/ (aref dired-directory last-idx))
+               (substring dired-directory 0 last-idx)
+             dired-directory)))))
+
+  :custom
+  (recentf-auto-cleanup 60)
+  (recentf-exclude
+   '("\\`out\\'"
+     "\\.log\\'"
+     "\\.el\\.gz\\'"
+     "/\\.emacs\\.d/elpa/.*-\\(autoloads\\|pkg\\)\\.el\\'"
+     "/\\.emacs\\.d/\\(auto-save-list\\|projects\\|recentf\\|snippets\\|tramp\\|var\\)"
+     "/\\.git/COMMIT_EDITMSG\\'"))
+  (recentf-filename-handlers '(abbreviate-file-name))
+  (recentf-max-saved-items 2000)
+
+  :hook
+  (dired-mode . recentf-add-dired-directory)
+
+  :commands (recentf-mode
+             recentf-add-file
+             recentf-save-list
+             recentf-string-member)
+
+  :config
+  (let ((inhibit-message t))
+    (recentf-mode 1))
+
+  (advice-add 'recentf-cleanup :around
+              (lambda (func &rest args)
+                "Do not print to the echo area when cleaning up
+`recentf-list'."
+                (let ((inhibit-message t))
+                  (apply func args)))))
+
+
+(use-package tramp-sh
+  :defer t
+
+  :init
+  ;; https://www.gnu.org/software/emacs/manual/html_node/tramp/Frequently-Asked-Questions.html
+  (setq
+   vc-ignore-dir-regexp
+   (format "\\(%s\\)\\|\\(%s\\)"
+           vc-ignore-dir-regexp
+           tramp-file-name-regexp)
+   tramp-connection-timeout 15
+   tramp-default-method "ssh"
+   tramp-use-ssh-controlmaster-options nil))
+
+
+;; Loaded in loadup.el
+(use-package select
+  :custom
+  (select-enable-clipboard t))
+
+
+;; Loaded in loadup.el
+(use-package uniquify
+  :custom
+  (uniquify-after-kill-buffer-p t)
+  (uniquify-buffer-name-style
+   'post-forward-angle-brackets nil (uniquify)))
+
+
+;;; Editing Helpers
+
+(use-package electric
+  :defer t
+  :custom
+  (electric-indent-mode t))
+
+
+(use-package elec-pair
+  :defer t
+  :custom
+  (electric-pair-mode t))
+
+
+(use-package ediff-wind
+  :defer t
+  :custom
+  (ediff-split-window-function 'split-window-horizontally)
+  (ediff-window-setup-function 'ediff-setup-windows-plain))
+
+
+(use-package ialign
+  :ensure t
+  :defer t
+  :bind ("C-c |" . ialign))
+
+
+(use-package unfill
+  :ensure t
+  :defer t
+  :bind ([remap fill-paragraph] . unfill-toggle))
+
+
+(use-package hideshow
+  :defer t
+  :diminish hs-minor-mode
+  :hook (prog-mode . hs-minor-mode))
+
+
+(use-package eldoc
+  :defer 2
+  :diminish
+  :hook
+  (prog-mode . global-eldoc-mode)
+  :config
+  (global-eldoc-mode t))
+
+
+(use-package which-func
+  :defer 2
+  :custom
+  (which-func-unknown "n/a")
+  :hook
+  (prog-mode . which-function-mode)
+  :config
+  (which-function-mode t))
+
+
+(use-package abbrev
+  :defer t
+  :diminish
+  :hook
+  ;; ((text-mode prog-mode) . abbrev-mode)
+  (expand-load
+   . (lambda ()
+       (add-hook 'expand-expand-hook #'indent-according-to-mode)
+       (add-hook 'expand-jump-hook #'indent-according-to-mode)))
+  :commands abbrev-mode ;; `cc-mode' turns on `abbrev-mode'.
+
+  :custom
+  (save-abbrevs 'silently)
+
+  :config
+  (if (file-exists-p abbrev-file-name)
+      (quietly-read-abbrev-file)))
+
+
+(use-package crux
+  :ensure t
+  :defer t)
+
+
+;;; Spelling & Linting
+
+(use-package ispell
+  :defer t
+
+  :custom
+  (ispell-program-name "hunspell")
+  (ispell-personal-dictionary "~/.emacs.d/ispell-personal-dictionary")
+  (ispell-silently-savep t)
+  (ispell-local-dictionary-alist
+   '(("en_US"
+      "[[:alpha:]]" "[^[:alpha:]]" "[']" nil
+      ("-d" "en_US") nil utf-8)))
+  (ispell-local-dictionary "en_US")
+
+  :config
+  ;; Hunspell cannot create the personal dictionary file if it does not exist.
+  (unless (file-exists-p ispell-personal-dictionary)
+    (make-empty-file ispell-personal-dictionary)))
+
+
+(use-package flyspell
+  :defer t
+  :bind ("C-c s b" . flyspell-buffer)
+
+  :preface
+  ;; https://github.com/abo-abo/oremacs/blob/github/modes/ora-flyspell.el
+  (defun flyspell-ignore-http-and-https ()
+    "Function used for `flyspell-generic-check-word-predicate' to
+ignore stuff starting with \"http\" or \"https\"."
+    (save-excursion
+      (forward-whitespace -1)
+      (not (looking-at "[\t ]+https?\\b"))))
+
+  :hook
+  (text-mode . flyspell-mode)
+
+  :custom
+  (flyspell-sort-corrections t)
+
+  :config
+  (dolist (mode '(text-mode org-mode)) ;; need to specify all derived modes
+    (put mode 'flyspell-mode-predicate #'flyspell-ignore-http-and-https)))
+
+
+(use-package flyspell-correct
+  :ensure t
+  :after flyspell
+  :defer t
+  :bind (:map flyspell-mode-map
+              ("C-c s w" . flyspell-correct-wrapper)))
+
+
+(use-package flymake
+  :defer t
+  :hook (sh-mode . flymake-mode))
+
+
+(use-package flycheck
+  :disabled ;; 2023-08-12 use `flymake'
+  :defer 2
+  :custom
+  (flycheck-disabled-checkers
+   '(c/c++-cppcheck
+     c/c++-gcc
+     go-build
+     go-errcheck
+     go-gofmt
+     go-golint
+     go-staticcheck
+     go-test
+     go-unconvert
+     go-vet
+     json-jsonlint
+     json-python-json
+     python-mypy
+     python-pycompile
+     python-pyright
+     ruby-rubocop
+     sh-bash
+     sh-posix-bash
+     sh-posix-dash
+     sh-zsh
+     yaml-jsyaml
+     yaml-ruby
+     emacs-lisp-checkdoc))
+  :config
+  (global-flycheck-mode 1))
+
+
+(use-package whitespace
+  :defer t
+  :bind (("C-c w m" . whitespace-mode)
+         ("C-c w r" . whitespace-report)
+         ("C-c w c" . whitespace-cleanup))
+
+  :diminish (global-whitespace-mode
+             whitespace-mode
+             whitespace-newline-mode)
+
+  :hook ((conf-mode
+          json-mode
+          ssh-config-mode
+          yaml-mode
+          makefile-mode)
+         . whitespace-mode)
+
+  :custom
+  (whitespace-line-column 100)
+  (whitespace-style '(face trailing tabs)))
+
+
+;;; Version Control
+
+(use-package diff-hl
+  :ensure t
+  :defer t
+
+  :hook ((conf-mode
+          protobuf-mode
+          ssh-config-mode
+          text-mode
+          prog-mode)
+         . diff-hl-mode)
+  (magit-pre-refresh . diff-hl-magit-pre-refresh)
+  (magit-post-refresh . diff-hl-magit-post-refresh)
+
+  :custom
+  (diff-hl-draw-borders nil))
+
+
+(use-package git-link
+  :ensure t
+  :defer t
+  :bind (("C-c g l" . git-link)
+         ("C-c g c" . git-link-commit)
+         ("C-c g h" . git-link-homepage))
+  :custom
+  (git-link-use-commit t))
+
+
+(use-package magit
+  :ensure t
+  :defer t
+  :config
+  (add-to-list 'display-buffer-alist
+               '("\\`magit:"
+                 (display-buffer-at-bottom)
+                 (inhibit-same-window . t)
+                 (window-height . 0.5)))
+  (add-to-list 'display-buffer-alist
+               '("\\`magit-process:"
+                 (display-buffer-in-direction)
+                 (direction . right)))
+  :custom
+  (magit-commit-show-diff nil))
+
+
+;;; AI Assistance
+
+(use-package copilot
+  :ensure t
+  :defer t
+  :bind (:map copilot-completion-map
+              ;; I use TAB to trigger `corfu' completion.
+              ;; ("<tab>" . copilot-accept-completion)
+              ;; ("TAB" . copilot-accept-completion)
+              ("C-e" . copilot-accept-completion)
+              ("C-<tab>" . copilot-accept-completion-by-word)
+              ("C-TAB" . copilot-accept-completion-by-word)
+              ("M-n" . copilot-next-completion)
+              ("M-p" . copilot-previous-completion)))
+
+
+;;; Compilation & Shell
 
 (use-package compile
   :defer t
@@ -1457,11 +1511,6 @@ this is effective with some expand functions, eg.,
              (auto-fill-mode -1))))
 
 
-(use-package cwarn
-  :commands cwarn-mode
-  :diminish)
-
-
 ;; https://github.com/jwiegley/dot-emacs/blob/master/init.org#ps-print
 (use-package ps-print
   :defer t
@@ -1483,6 +1532,8 @@ this is effective with some expand functions, eg.,
   :config
   (setq ps-print-region-function 'ps-spool-to-pdf))
 
+
+;;; Org Mode
 
 (use-package org
   :ensure t
@@ -1928,6 +1979,8 @@ If no ID exists, this does nothing."
   :defer t)
 
 
+;;; Markup & Documentation
+
 (use-package markdown-mode
   :ensure t
   :mode (("\\.md\\'"       . gfm-mode)
@@ -1959,6 +2012,8 @@ This only affects the current markdown buffer, and does not add the
   :ensure t
   :defer t)
 
+
+;;; Code Structure
 
 (use-package paredit
   :disabled
@@ -1995,45 +2050,7 @@ This only affects the current markdown buffer, and does not add the
   (push `(json-mode . ,hes-js-escape-sequence-re) hes-mode-alist))
 
 
-(use-package git-link
-  :ensure t
-  :defer t
-  :bind (("C-c g l" . git-link)
-         ("C-c g c" . git-link-commit)
-         ("C-c g h" . git-link-homepage))
-  :custom
-  (git-link-use-commit t))
-
-
-(use-package magit
-  :ensure t
-  :defer t
-  :config
-  (add-to-list 'display-buffer-alist
-               '("\\`magit:"
-                 (display-buffer-at-bottom)
-                 (inhibit-same-window . t)
-                 (window-height . 0.5)))
-  (add-to-list 'display-buffer-alist
-               '("\\`magit-process:"
-                 (display-buffer-in-direction)
-                 (direction . right)))
-  :custom
-  (magit-commit-show-diff nil))
-
-
-(use-package which-key
-  :defer 2
-  :diminish
-  :config
-  (which-key-mode))
-
-
-(use-package unfill
-  :ensure t
-  :defer t
-  :bind ([remap fill-paragraph] . unfill-toggle))
-
+;;; Code Formatting
 
 (use-package reformatter
   :ensure t
@@ -2105,6 +2122,29 @@ This only affects the current markdown buffer, and does not add the
        (google-set-c-style)
        (google-make-newline-indent))))
 
+
+;;; LSP
+
+(use-package eglot
+  :defer t
+  :custom
+  (eglot-autoshutdown t)
+  (eglot-events-buffer-size 0)
+  ;; (eglot-ignored-server-capabilites
+  ;;  '(:documentHighlightProvider
+  ;;    :codeActionProvider
+  ;;    :codeLensProvider
+  ;;    :documentFormattingProvider
+  ;;    :documentRangeFormattingProvider
+  ;;    :documentOnTypeFormattingProvider
+  ;;    :documentLinkProvider))
+
+  ;; :config
+  ;; (add-to-list 'eglot-stay-out-of 'flymake)
+  )
+
+
+;;; Programming Languages
 
 (use-package prog-mode
   :defer t
@@ -2205,6 +2245,11 @@ If no symbol at point, quit the *Help* window if visible."
 
   :config
   (unbind-key "C-c C-c" c++-mode-map))
+
+
+(use-package cwarn
+  :commands cwarn-mode
+  :diminish)
 
 
 (use-package python
@@ -2392,6 +2437,8 @@ If no symbol at point, quit the *Help* window if visible."
   (plantuml-indent-level 2))
 
 
+;;; Theme & Appearance
+
 (use-package zenburn-theme
   :disabled
   :ensure t
@@ -2456,15 +2503,8 @@ If no symbol at point, quit the *Help* window if visible."
                 (set-frame-parameter nil 'fullscreen 'maximized))))
 
 
-;; Use a heavier box-drawing character for the vertical window border
-;; in terminal Emacs, where faces cannot style the border.
-(unless (display-graphic-p)
-  (set-display-table-slot standard-display-table 'vertical-border ?┃))
+;;; Custom Functions & Keybindings
 
-
-;;
-;; Functions and keybindings
-;;
 (defun copy-buffer-path (&optional relative-to)
   "Copy the current buffer's file path to the kill ring.
 When RELATIVE-TO is non-nil, copy the path relative to that
