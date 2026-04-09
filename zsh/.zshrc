@@ -382,9 +382,9 @@ setopt INTERACTIVE_COMMENTS
 function xterm_title { print -Pn -- '\e]2;%m: %~\a' }
 add-zsh-hook precmd xterm_title
 
-# Use steady block cursor, and restore it after programs that change cursor
-# shape (e.g. vim with mode-dependent cursors).
-function reset_cursor { echo -ne '\e[2 q' }
+# Use steady block cursor with default color, and restore it after programs
+# that change cursor shape or color (e.g. vim with mode-dependent cursors).
+function reset_cursor { print -Pn -- '\e[2 q\e]112\a' }
 add-zsh-hook precmd reset_cursor
 
 # Disable the suspend keybinding (Ctrl-Z)
