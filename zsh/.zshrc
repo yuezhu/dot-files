@@ -66,29 +66,6 @@ _prepend_fpath \
   "${HOME}/.nix-profile/share/zsh/site-functions" \
   "${HOMEBREW_PREFIX}/share/zsh-completions"
 
-## Plugins
-
-# zsh-autosuggestions
-if dir=$(_first_dir \
-           "${HOME}/.nix-profile/share/zsh-autosuggestions" \
-           "${HOMEBREW_PREFIX}/share/zsh-autosuggestions"); then
-  source "${dir}/zsh-autosuggestions.zsh"
-fi
-
-# zsh-fast-syntax-highlighting
-if dir=$(_first_dir \
-           "${HOME}/.nix-profile/share/zsh/plugins/fast-syntax-highlighting" \
-           "${HOMEBREW_PREFIX}/share/zsh-fast-syntax-highlighting"); then
-  source "${dir}/fast-syntax-highlighting.plugin.zsh"
-elif dir=$(_first_dir \
-             "${HOME}/.nix-profile/share/zsh-syntax-highlighting" \
-             "${HOMEBREW_PREFIX}/share/zsh-syntax-highlighting"); then
-  # Or try zsh-syntax-highlighting
-  export ZSH_HIGHLIGHT_HIGHLIGHTERS_DIR="${dir}/highlighters"
-  source "${dir}/zsh-syntax-highlighting.zsh"
-  export ZSH_HIGHLIGHT_STYLES[comment]='fg=245'
-fi
-
 ## fzf
 
 if exe=$(_first_exec \
@@ -392,6 +369,29 @@ stty susp undef
 
 # Configure pinentry to use the correct TTY
 export GPG_TTY=$TTY
+
+## Plugins
+
+# zsh-autosuggestions
+if dir=$(_first_dir \
+           "${HOME}/.nix-profile/share/zsh-autosuggestions" \
+           "${HOMEBREW_PREFIX}/share/zsh-autosuggestions"); then
+  source "${dir}/zsh-autosuggestions.zsh"
+fi
+
+# zsh-fast-syntax-highlighting
+if dir=$(_first_dir \
+           "${HOME}/.nix-profile/share/zsh/plugins/fast-syntax-highlighting" \
+           "${HOMEBREW_PREFIX}/share/zsh-fast-syntax-highlighting"); then
+  source "${dir}/fast-syntax-highlighting.plugin.zsh"
+elif dir=$(_first_dir \
+             "${HOME}/.nix-profile/share/zsh-syntax-highlighting" \
+             "${HOMEBREW_PREFIX}/share/zsh-syntax-highlighting"); then
+  # Or try zsh-syntax-highlighting
+  export ZSH_HIGHLIGHT_HIGHLIGHTERS_DIR="${dir}/highlighters"
+  source "${dir}/zsh-syntax-highlighting.zsh"
+  export ZSH_HIGHLIGHT_STYLES[comment]='fg=245'
+fi
 
 ## Pager
 
