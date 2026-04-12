@@ -330,6 +330,10 @@ PROMPT='%B%F{green}%m%f %F{blue}%~%f${vcs_info_msg_0_} %#%b '
 
 ## Shell Options
 
+# Characters considered part of a word for word-based movement and deletion
+# Default is *?_-.[]~=/&;!#$%^(){}<>
+WORDCHARS='*?_.[]~&;!#$%^(){}<>'
+
 # Try to correct the spelling of all arguments in a line.
 # The shell variable CORRECT_IGNORE_FILE may be set to a pattern to match file
 # names that will never be offered as corrections.
