@@ -38,25 +38,27 @@ DATA="$(cat)"
 
 # Set the local system clipboard if a clipboard tool is available.
 # This is separate from OSC 52 - it handles the local X11/macOS clipboard.
-if command -v xsel >/dev/null 2>&1; then
+if command -v xsel >/dev/null 2>&1 && [ -n "$DISPLAY" ]; then
   printf '%s' "$DATA" | xsel -i -p
   printf '%s' "$DATA" | xsel -i -b
 elif command -v pbcopy >/dev/null 2>&1; then
   printf '%s' "$DATA" | pbcopy
 fi
 
+# Truncate raw data before encoding if it would exceed the OSC 52 limit.
+# Truncating raw bytes (instead of the base64 output) keeps the encoding valid.
+RAW_LIMIT=$(( LIMIT * 3 / 4 ))
+DATA_LEN="${#DATA}"
+if [ "$DATA_LEN" -gt "$RAW_LIMIT" ]; then
+  DATA_KB=$(( DATA_LEN / 1024 ))
+  LIMIT_KB=$(( RAW_LIMIT / 1024 ))
+  DATA="$(printf '%s' "$DATA" | head -c "$RAW_LIMIT")"
+  tmux display-message "OSC 52: selection truncated (${DATA_KB}KB > ${LIMIT_KB}KB)"
+fi
+
 # Base64-encode the text for embedding in the OSC 52 escape sequence.
 # tr -d '\n' strips line breaks that base64 adds every 76 characters.
 B64="$(printf '%s' "$DATA" | base64 | tr -d '\n')"
-
-# Truncate if the base64 payload is too large for the terminal to accept
-B64_LEN="${#B64}"
-if [ "$B64_LEN" -gt "$LIMIT" ]; then
-  DATA_KB=$(( B64_LEN * 3 / 4 / 1024 ))
-  LIMIT_KB=$(( LIMIT * 3 / 4 / 1024 ))
-  B64="$(printf '%s' "$B64" | head -c "$LIMIT")"
-  tmux display-message "OSC 52: selection truncated (${DATA_KB}KB > ${LIMIT_KB}KB)"
-fi
 
 # Write the OSC 52 sequence to the pane's TTY. The sequence format is:
 #   ESC ] 52 ; c ; <base64> BEL
