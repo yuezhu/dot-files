@@ -77,7 +77,7 @@ if exe=$(_first_exec \
     --border top \
     --wrap \
     --highlight-line \
-    --preview 'echo {}' \
+    --preview 'printf \"%s\\n\" {}' \
     --preview-window hidden,wrap \
     --color 'hl:underline:yellow,hl+:underline:yellow:bold' \
     --bind \
@@ -168,14 +168,6 @@ if dir=$(_first_dir \
            "${HOMEBREW_PREFIX}/share/fzf-tab"); then
 
   source "${dir}/fzf-tab.zsh"
-
-  # To make fzf-tab follow FZF_DEFAULT_OPTS.
-  # NOTE: This may lead to unexpected behavior since some flags break this plugin. See Aloxaf/fzf-tab#455.
-  zstyle ':fzf-tab:*' use-fzf-default-opts yes
-
-  # The default fzf-pad=2 was designed for fzf without --border. My
-  # FZF_DEFAULT_OPTS that includes --border adds an extra line to the fzf window.
-  zstyle ':fzf-tab:*' fzf-pad 3
 
   # force zsh not to show completion menu, which allows fzf-tab to capture the unambiguous prefix
   zstyle ':completion:*' menu no
