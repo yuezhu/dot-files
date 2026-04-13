@@ -117,6 +117,13 @@ MAX-HEIGHT-FRACTION is the maximum height as a fraction of the frame height
                     (assq pkg package-alist)
                   (apply func args)))))
 
+(advice-add 'package-upgrade-all :around
+            (lambda (fn &rest args)
+              "Skip the y-or-n-p confirmation prompt."
+              (cl-letf (((symbol-function 'y-or-n-p)
+                         (lambda (&rest _) t)))
+                (apply fn args))))
+
 (add-to-list 'package-archives
              '("melpa" . "https://melpa.org/packages/") t)
 
