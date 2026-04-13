@@ -2499,7 +2499,7 @@ If no symbol at point, quit the *Help* window if visible."
                  ((eq system-type 'darwin)
                   (set-face-attribute
                    'default nil :font
-                   "-*-Menlo-regular-normal-normal-*-14-*-*-*-*-0-iso10646-1")))
+                   "-*-JetBrains Mono-regular-normal-normal-*-14-*-*-*-m-0-iso10646-1")))
                 (set-frame-parameter nil 'fullscreen 'maximized))))
 
 
