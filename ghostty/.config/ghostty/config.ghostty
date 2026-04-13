@@ -1,16 +1,32 @@
+## Appearance
+# Color theme
 theme = Modus Vivendi
-
+# Use Display P3 color space for more vivid colors
 window-colorspace = display-p3
 
+## Font
+# Make text appear bolder
 font-thicken = true
+# How much bolder the text appears (0–255, higher = thicker)
 font-thicken-strength = 31
+# Text size in points
 font-size = 14
 
+## Cursor
+# Cursor shape: block, bar, or underline
 cursor-style = block
+# Keep the cursor steady instead of blinking
 cursor-style-blink = false
+# Disable "shell integration" cursor changes so cursor stays as set above
 shell-integration-features = no-cursor
 
+## Clipboard
+# Ask for confirmation before pasting potentially harmful text
 clipboard-paste-protection = true
+# Only allow pasting when the program supports "bracketed paste"
+# (a protocol that prevents pasted text from being run as commands)
 clipboard-paste-bracketed-safe = true
 
+## Scrollback
+# How many bytes of terminal output to keep for scrolling back (≈25 MB)
 scrollback-limit = 25000000
