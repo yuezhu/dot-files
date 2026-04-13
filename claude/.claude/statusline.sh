@@ -25,19 +25,8 @@ eval "$(echo "$INPUT" | jq -r '
   "DIR=" + (.workspace.current_dir | @sh),
   "COST=" + (.cost.total_cost_usd // 0 | tostring),
   "PCT=" + ((.context_window.used_percentage // 0) | ceil | tostring),
-  "DURATION_MS=" + (.cost.total_duration_ms // 0 | tostring),
-  "USED_TOKENS=" + (((.context_window.total_input_tokens // 0) + (.context_window.total_output_tokens // 0)) | tostring),
-  "CTX_SIZE=" + ((.context_window.context_window_size // 0) | tostring)
+  "DURATION_MS=" + (.cost.total_duration_ms // 0 | tostring)
 ')"
-
-# --- Context-window percentage ------------------------------------------------
-# Recompute from raw token counts when available; the pre-computed
-# used_percentage can lag behind or lose precision from rounding.
-
-if [ "$CTX_SIZE" -gt 0 ] && [ "$USED_TOKENS" -gt 0 ]; then
-  PCT=$((USED_TOKENS * 100 / CTX_SIZE))
-  [ "$PCT" -gt 100 ] && PCT=100
-fi
 
 # --- ANSI colors --------------------------------------------------------------
 
