@@ -184,7 +184,8 @@ Only treat them as installed if present in `package-alist'."
   ;; (ns-command-modifier 'meta)
 
   ;; src/frame.c
-  (menu-bar-mode (eq system-type 'darwin))
+  ;; On macOS GUI, the menu bar is part of the native title bar
+  (menu-bar-mode (and (eq system-type 'darwin) (display-graphic-p)))
   (tool-bar-mode nil)
 
   ;; src/xdisp.c
@@ -194,6 +195,8 @@ Only treat them as installed if present in `package-alist'."
      "GNU Emacs " emacs-version " - " system-name))
   (max-mini-window-height 0.5)
   (redisplay-skip-fontification-on-input t)
+  ;; Remove trailing dashes from the mode line
+  (mode-line-end-spaces nil)
 
   ;; src/lread.c
   (load-prefer-newer t)
