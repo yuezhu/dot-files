@@ -639,6 +639,9 @@ Only treat them as installed if present in `package-alist'."
   :after vertico
   :demand t
 
+  ;; Pulse the line after jumping, like `xref' does
+  :hook (consult-after-jump . xref-pulse-momentarily)
+
   ;; Replace bindings. Lazily loaded by `use-package'.
   :bind (;; C-c bindings in `mode-specific-map'
          ("C-c M-x" . consult-mode-command)
