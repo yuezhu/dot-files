@@ -111,18 +111,24 @@ MAX-HEIGHT-FRACTION is the maximum height as a fraction of the frame height
   "A list of packages that must use ELPA versions.")
 
 (advice-add 'package-installed-p :around
-            (lambda (func &rest args)
+            (lambda (fn &rest args)
+              "Ignore built-in versions for packages in `package-must-use-elpa-packages'.
+Only treat them as installed if present in `package-alist'."
               (let ((pkg (car args)))
                 (if (memq pkg package-must-use-elpa-packages)
                     (assq pkg package-alist)
-                  (apply func args)))))
+                  (apply fn args)))))
 
 (advice-add 'package-upgrade-all :around
             (lambda (fn &rest args)
-              "Skip the y-or-n-p confirmation prompt."
-              (cl-letf (((symbol-function 'y-or-n-p)
-                         (lambda (&rest _) t)))
-                (apply fn args))))
+              "Skip the confirmation prompt and display the names of upgraded packages."
+              (package-refresh-contents)
+              (let ((upgradeable (package--upgradeable-packages)))
+                (apply fn '(nil))
+                (if upgradeable
+                    (message "Upgraded: %s"
+                             (mapconcat #'symbol-name upgradeable ", "))
+                  (message "No packages to upgrade")))))
 
 (add-to-list 'package-archives
              '("melpa" . "https://melpa.org/packages/") t)
