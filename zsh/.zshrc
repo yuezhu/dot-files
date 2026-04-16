@@ -207,6 +207,9 @@ else
 
   # Enable scrolling through a completion list
   zstyle ':completion:*:default' list-prompt ''
+
+  # Colorize kill completion menu (pid=red, user=cyan, etime=yellow, command=default)
+  zstyle ':completion:*:*:*:*:processes' list-colors '=(#b) #([0-9]##) ([0-9a-z_-]##) #([^ ]##) *=0=31=36=33'
 fi
 
 # Display lists of matches for files in different colours depending on the file
@@ -229,10 +232,7 @@ zstyle ':completion:*:*:*:users' ignored-patterns '_*'
 zstyle ':completion:*:complete:-command-::commands' ignored-patterns '*~'
 
 # Kill command completion
-zstyle ':completion:*:*:kill:*:processes' command 'ps -U ${USERNAME} -o pid,user,command | sed "/ps -U '\''${USERNAME}'\''/d"'
-
-# Colorize kill completion menu
-zstyle ':completion:*:*:*:*:processes' list-colors '=(#b) #([0-9]##) ([0-9a-z_-]##) *=0=31=36'
+zstyle ':completion:*:*:kill:*:processes' command 'ps -U ${USERNAME} -o pid,user,etime,command | sed "/ps -U '\''${USERNAME}'\''/d"'
 
 ## History
 
