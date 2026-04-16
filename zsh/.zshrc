@@ -361,7 +361,7 @@ function reset_cursor { print -Pn -- '\e[2 q\e]112\a' }
 add-zsh-hook precmd reset_cursor
 
 # Disable the suspend keybinding (Ctrl-Z)
-stty susp undef
+# stty susp undef
 
 # Configure pinentry to use the correct TTY
 export GPG_TTY=$TTY
