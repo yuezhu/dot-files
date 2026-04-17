@@ -599,7 +599,8 @@ Only treat them as installed if present in `package-alist'."
   ;; (vertico-resize t) ;; Grow and shrink the Vertico minibuffer
   ;; (vertico-cycle t) ;; Enable cycling for `vertico-next/previous'
   (vertico-multiform-commands
-   '((consult-yank-pop indexed)
+   '((execute-extended-command marginalia-mode)
+     (consult-yank-pop indexed)
      (consult-yank-replace indexed)
      (consult-imenu (completion-ignore-case . t))
      (consult-recent-file (completion-ignore-case . t))))
@@ -773,8 +774,7 @@ Only treat them as installed if present in `package-alist'."
   :bind (:map minibuffer-local-map
               ("M-A" . marginalia-cycle))
 
-  :config
-  (marginalia-mode))
+  )
 
 
 (use-package embark
@@ -2518,7 +2518,7 @@ If no symbol at point, quit the *Help* window if visible."
                  ((eq system-type 'darwin)
                   (set-face-attribute
                    'default nil :font
-                   "-*-JetBrains Mono-regular-normal-normal-*-14-*-*-*-m-0-iso10646-1")))
+                   (font-spec :family "JetBrains Mono" :size 14))))
                 (set-frame-parameter nil 'fullscreen 'maximized))))
 
 
