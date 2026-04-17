@@ -4,7 +4,7 @@ Personal configuration files managed with GNU Stow.
 
 ## Structure
 
-Each top-level directory is a stow package targeting `$HOME`:
+Each top-level directory is a stow package targeting `$HOME`. Files within each package mirror the home directory layout (e.g., `zsh/.zshrc` deploys to `~/.zshrc`).
 
 - `claude/` — Claude Code hooks and statusline script
 - `emacs/` — Emacs config (`early-init.el`, `init.el`)
@@ -12,7 +12,7 @@ Each top-level directory is a stow package targeting `$HOME`:
 - `git/` — gitconfig, gitignore_global, gitattributes
 - `mpv/` — mpv media player config and keybindings
 - `tmux/` — tmux.conf, clipboard helper scripts (tmux-copy.sh, tmux-paste.sh)
-- `vim/` — minimal .vimrc
+- `vim/` — .vimrc
 - `yamllint/` — yamllint config
 - `zsh/` — .zshrc
 
