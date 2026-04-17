@@ -9,6 +9,8 @@ window-colorspace = display-p3
 font-thicken = true
 # How much bolder the text appears (0–255, higher = thicker)
 font-thicken-strength = 31
+# Disable ligatures (e.g. -> rendered as a single arrow glyph)
+font-feature = -calt
 # Text size in points
 font-size = 14
 
