@@ -65,15 +65,20 @@ pct_bar() {
 
 # human_duration <milliseconds>
 #   Print elapsed time using the most natural unit pair:
-#     < 1 min → "5s"  ·  < 1 hr → "4m 12s"  ·  ≥ 1 hr → "1h 23m"
+#     < 1 min  → "5s"
+#     < 1 hr   → "4m 12s"
+#     < 1 day  → "1h 23m"
+#     ≥ 1 day  → "2d 5h"
 human_duration() {
   _total_secs=$(($1 / 1000))
   if [ "$_total_secs" -lt 60 ]; then
     printf '%ds' "$_total_secs"
   elif [ "$_total_secs" -lt 3600 ]; then
     printf '%dm %ds' "$((_total_secs / 60))" "$((_total_secs % 60))"
-  else
+  elif [ "$_total_secs" -lt 86400 ]; then
     printf '%dh %dm' "$((_total_secs / 3600))" "$((_total_secs % 3600 / 60))"
+  else
+    printf '%dd %dh' "$((_total_secs / 86400))" "$((_total_secs % 86400 / 3600))"
   fi
 }
 
