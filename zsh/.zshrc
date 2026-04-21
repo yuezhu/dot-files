@@ -34,6 +34,18 @@ function _prepend_fpath {
   done
 }
 
+# Prepend each existing directory to NODE_PATH
+typeset -T NODE_PATH node_path :
+typeset -U node_path
+export NODE_PATH
+
+function _prepend_node_path {
+  local d
+  for d in "$@"; do
+    [[ -d "$d" ]] && node_path=("$d" $node_path)
+  done
+}
+
 ## Environment & Path
 
 # Ensure uniqueness for path and fpath arrays
@@ -60,6 +72,10 @@ _prepend_path \
 _prepend_path \
   "${HOME}/bin" \
   "${HOME}/Library/Mobile Documents/com~apple~CloudDocs/bin"
+
+# User-level Node modules
+_prepend_node_path \
+  "${HOME}/.local/node_modules"
 
 # Additional completion functions
 _prepend_fpath \
