@@ -607,32 +607,7 @@ Only treat them as installed if present in `package-alist'."
 
   :config
   (vertico-mode)
-  (vertico-multiform-mode)
-
-  ;; Debug: vertico sometimes opens a dired buffer when selecting a file.
-  ;; The only code path in `find-file-noselect' that opens dired is when
-  ;; `file-directory-p' returns t. This advice logs the filesystem state
-  ;; when a filename with a file extension (e.g. .json) is unexpectedly
-  ;; a directory, to confirm the root cause.  Remove once diagnosed.
-  (defun debug-find-file-noselect (filename &rest _)
-    (let ((expanded (abbreviate-file-name (expand-file-name filename))))
-      (when (and (file-directory-p expanded)
-                 (string-match-p "\\.[a-zA-Z0-9]+\\'" expanded))
-        (message "[DEBUG find-file] '%s' is a directory! file-regular-p=%s file-symlink-p=%s contents=%s"
-                 expanded
-                 (file-regular-p expanded)
-                 (file-symlink-p expanded)
-                 (ignore-errors (directory-files expanded nil nil t))))))
-
-  (advice-add 'find-file-noselect :before #'debug-find-file-noselect)
-
-  (defun log-vertico-exit (&rest _)
-    (message "[DEBUG vertico-exit] vertico exit: minibuffer='%s' candidate='%s' command='%s'"
-             (minibuffer-contents)
-             (vertico--candidate)
-             this-command))
-
-  (advice-add 'vertico-exit :before #'log-vertico-exit))
+  (vertico-multiform-mode))
 
 
 (use-package consult
