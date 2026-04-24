@@ -2141,38 +2141,102 @@ This only affects the current markdown buffer, and does not add the
 (use-package treesit
   :defer t
   :preface
-  (defun treesit-install-all-grammars ()
-    "Install any grammars in `treesit-language-source-alist' not yet available."
-    (interactive)
-    (dolist (lang treesit-language-source-alist)
-      (unless (treesit-language-available-p (car lang))
-        (treesit-install-language-grammar (car lang)))))
+  (defmacro treesit-define-remap (&rest args)
+    "Define a tree-sitter mode remap with on-demand grammar installation.
+Keyword arguments:
+  :from    CLASSIC-MODE — the mode to remap from.
+  :to      TS-MODE      — the tree-sitter mode to remap to.
+  :grammar (LANG URL)   — one or more grammar specs; LANG is the tree-sitter
+                          language symbol and URL is its grammar source.
+The generated wrapper TS-MODE+ prompts to install any missing grammars.
+If all grammars are present or installed, TS-MODE is activated; otherwise
+CLASSIC-MODE is activated with a fallback message."
+    (let (from to grammar-specs (remaining args))
+      ;; Parse the keyword sections.  :grammar collects all (lang url) items
+      ;; that follow until the next keyword or end of args.
+      (while remaining
+        (pcase (pop remaining)
+          (:from    (setq from (pop remaining)))
+          (:to      (setq to (pop remaining)))
+          (:grammar (while (and remaining (not (keywordp (car remaining))))
+                      (push (pop remaining) grammar-specs)))))
+      (setq grammar-specs (nreverse grammar-specs))
+      (let* ((wrapper (intern (format "%s+" to)))
+             (langs (mapcar #'car grammar-specs)))
+        `(progn
+           (defun ,wrapper ()
+             ,(format "Ensure tree-sitter grammar(s) for `%s', then activate it.\n\
+Falls back to `%s' if any grammar install is declined." to from)
+             ;; Collect all grammars not yet installed so we can prompt once
+             ;; for all of them rather than asking separately for each.
+             (let ((missing (cl-remove-if #'treesit-language-available-p ',langs)))
+               (if (or (null missing)   ; all grammars already installed
+                       (and (y-or-n-p
+                             (format "Install tree-sitter grammar(s) for %s? "
+                                     (mapconcat #'symbol-name missing ", ")))
+                            ;; Load treesit so its defvar for
+                            ;; `treesit-language-source-alist' has run before
+                            ;; we let-bind it; the let scope keeps the URLs
+                            ;; temporary rather than mutating the global value.
+                            (progn
+                              (require 'treesit)
+                              (let ((treesit-language-source-alist ',grammar-specs))
+                                (mapc #'treesit-install-language-grammar missing))
+                              t)))
+                   (,to)
+                 (message "Falling back to `%s' (tree-sitter grammar not installed)" ',from)
+                 ;; Temporarily clear `major-mode-remap-alist' when falling back to
+                 ;; the classic mode, so it does not recurse back into this wrapper.
+                 (let ((major-mode-remap-alist nil))
+                   (,from)))))
+           (add-to-list 'major-mode-remap-alist '(,from . ,wrapper))))))
 
   :init
-  ;; Grammar source URLs used by `treesit-install-language-grammar' and
-  ;; `treesit-install-all-grammars'.  Set in :init so the value is available
-  ;; before treesit.el loads.
-  (setq treesit-language-source-alist
-        '((bash   "https://github.com/tree-sitter/tree-sitter-bash")
-          (c      "https://github.com/tree-sitter/tree-sitter-c")
-          (cpp    "https://github.com/tree-sitter/tree-sitter-cpp")
-          (java   "https://github.com/tree-sitter/tree-sitter-java")
-          (json   "https://github.com/tree-sitter/tree-sitter-json")
-          (python "https://github.com/tree-sitter/tree-sitter-python")
-          (rust   "https://github.com/tree-sitter/tree-sitter-rust")))
-
-  ;; Remap classic modes to their tree-sitter equivalents when the
-  ;; required grammars are available.  `major-mode-remap-alist' redirects
-  ;; the mode at file-open time regardless of file extension.
-  (dolist (entry '((sh-mode     bash-ts-mode  bash)
-                   (c-mode      c-ts-mode     c)
-                   (c++-mode    c++-ts-mode   c cpp)
-                   (java-mode   java-ts-mode  java)
-                   (json-mode   json-ts-mode  json)
-                   (python-mode python-ts-mode python)
-                   (rust-mode   rust-ts-mode  rust)))
-    (when (cl-every #'treesit-language-available-p (cddr entry))
-      (add-to-list 'major-mode-remap-alist (cons (car entry) (cadr entry)))))
+  ;; Remap classic modes to their tree-sitter equivalents, installing grammars
+  ;; on demand.  `major-mode-remap-alist' redirects the mode at file-open time
+  ;; regardless of file extension.
+  (treesit-define-remap
+   :from sh-mode
+   :to bash-ts-mode
+   :grammar (bash "https://github.com/tree-sitter/tree-sitter-bash"))
+  (treesit-define-remap
+   :from c-mode
+   :to c-ts-mode
+   :grammar (c "https://github.com/tree-sitter/tree-sitter-c"))
+  (treesit-define-remap
+   :from c++-mode
+   :to c++-ts-mode
+   :grammar
+   (c   "https://github.com/tree-sitter/tree-sitter-c")
+   (cpp "https://github.com/tree-sitter/tree-sitter-cpp"))
+  (treesit-define-remap
+   :from css-mode
+   :to css-ts-mode
+   :grammar (css "https://github.com/tree-sitter/tree-sitter-css"))
+  (treesit-define-remap
+   :from mhtml-mode
+   :to html-ts-mode
+   :grammar (html "https://github.com/tree-sitter/tree-sitter-html"))
+  (treesit-define-remap
+   :from java-mode
+   :to java-ts-mode
+   :grammar (java "https://github.com/tree-sitter/tree-sitter-java"))
+  (treesit-define-remap
+   :from js-mode
+   :to js-ts-mode
+   :grammar (javascript "https://github.com/tree-sitter/tree-sitter-javascript"))
+  (treesit-define-remap
+   :from json-mode
+   :to json-ts-mode
+   :grammar (json "https://github.com/tree-sitter/tree-sitter-json"))
+  (treesit-define-remap
+   :from python-mode
+   :to python-ts-mode
+   :grammar (python "https://github.com/tree-sitter/tree-sitter-python"))
+  (treesit-define-remap
+   :from rust-mode
+   :to rust-ts-mode
+   :grammar (rust "https://github.com/tree-sitter/tree-sitter-rust"))
 
   :custom
   ;; Font-lock level for tree-sitter grammars: 1–4, where 4 enables the most
