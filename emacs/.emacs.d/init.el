@@ -119,16 +119,20 @@ Only treat them as installed if present in `package-alist'."
                     (assq pkg package-alist)
                   (apply fn args)))))
 
+(defun package-upgrade-all--report (upgraded)
+  "Display message listing UPGRADED packages, or note if none were upgraded."
+  (if upgraded
+      (message "Upgraded: %s — restart Emacs to load new versions"
+               (mapconcat #'symbol-name upgraded ", "))
+    (message "No packages to upgrade")))
+
 (advice-add 'package-upgrade-all :around
             (lambda (fn &rest args)
               "Skip the confirmation prompt and display the names of upgraded packages."
               (package-refresh-contents)
               (let ((upgradeable (package--upgradeable-packages)))
                 (apply fn '(nil))
-                (if upgradeable
-                    (message "Upgraded: %s"
-                             (mapconcat #'symbol-name upgradeable ", "))
-                  (message "No packages to upgrade")))))
+                (package-upgrade-all--report upgradeable))))
 
 (add-to-list 'package-archives
              '("melpa" . "https://melpa.org/packages/") t)
@@ -158,6 +162,30 @@ Only treat them as installed if present in `package-alist'."
 (use-package diminish
   :ensure t
   :defer t)
+
+(use-package async
+  :ensure t
+  :commands (async-start))
+
+(defun package-upgrade-all-async ()
+  "Upgrade all packages asynchronously without blocking Emacs."
+  (interactive)
+  (message "Upgrading packages in background...")
+  (let ((archives package-archives))
+    (async-start
+     `(lambda ()
+        (require 'package)
+        (setq package-archives ',archives)
+        (package-initialize)
+        (package-refresh-contents)
+        (let ((upgradeable (package--upgradeable-packages)))
+          (package-upgrade-all nil)
+          upgradeable))
+     ;; On subprocess error, async re-signals it in the process sentinel
+     ;; rather than calling this callback, so errors surface as
+     ;; "error in process sentinel: ..." in the *Messages* buffer.
+     (lambda (upgraded)
+       (package-upgrade-all--report upgraded)))))
 
 
 ;;; Core Emacs Settings
