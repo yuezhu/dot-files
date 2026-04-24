@@ -2138,6 +2138,49 @@ This only affects the current markdown buffer, and does not add the
   )
 
 
+(use-package treesit
+  :defer t
+  :preface
+  (defun treesit-install-all-grammars ()
+    "Install any grammars in `treesit-language-source-alist' not yet available."
+    (interactive)
+    (dolist (lang treesit-language-source-alist)
+      (unless (treesit-language-available-p (car lang))
+        (treesit-install-language-grammar (car lang)))))
+
+  :init
+  ;; Grammar source URLs used by `treesit-install-language-grammar' and
+  ;; `treesit-install-all-grammars'.  Set in :init so the value is available
+  ;; before treesit.el loads.
+  (setq treesit-language-source-alist
+        '((bash   "https://github.com/tree-sitter/tree-sitter-bash")
+          (c      "https://github.com/tree-sitter/tree-sitter-c")
+          (cpp    "https://github.com/tree-sitter/tree-sitter-cpp")
+          (java   "https://github.com/tree-sitter/tree-sitter-java")
+          (json   "https://github.com/tree-sitter/tree-sitter-json")
+          (python "https://github.com/tree-sitter/tree-sitter-python")
+          (rust   "https://github.com/tree-sitter/tree-sitter-rust")))
+
+  ;; Remap classic modes to their tree-sitter equivalents when the
+  ;; required grammars are available.  `major-mode-remap-alist' redirects
+  ;; the mode at file-open time regardless of file extension.
+  (dolist (entry '((sh-mode     bash-ts-mode  bash)
+                   (c-mode      c-ts-mode     c)
+                   (c++-mode    c++-ts-mode   c cpp)
+                   (java-mode   java-ts-mode  java)
+                   (json-mode   json-ts-mode  json)
+                   (python-mode python-ts-mode python)
+                   (rust-mode   rust-ts-mode  rust)))
+    (when (cl-every #'treesit-language-available-p (cddr entry))
+      (add-to-list 'major-mode-remap-alist (cons (car entry) (cadr entry)))))
+
+  :custom
+  ;; Font-lock level for tree-sitter grammars: 1–4, where 4 enables the most
+  ;; detailed syntax highlighting (e.g. distinguishing function calls from
+  ;; definitions, punctuation, etc.).
+  (treesit-font-lock-level 4))
+
+
 ;;; Programming Languages
 
 (use-package prog-mode
