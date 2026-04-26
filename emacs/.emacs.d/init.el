@@ -606,7 +606,9 @@ Only treat them as installed if present in `package-alist'."
 
 (use-package vertico
   :ensure t
-  :demand t
+
+  :init
+  (vertico-mode)
 
   :hook
   (minibuffer-setup
@@ -634,14 +636,25 @@ Only treat them as installed if present in `package-alist'."
      (consult-recent-file (completion-ignore-case . t))))
 
   :config
-  (vertico-mode)
   (vertico-multiform-mode))
+
+
+;; Configure directory extension.
+(use-package vertico-directory
+  :after vertico
+  :ensure nil
+  ;; More convenient directory navigation commands
+  :bind (:map vertico-map
+              ("RET" . vertico-directory-enter)
+              ("DEL" . vertico-directory-delete-char)
+              ("M-DEL" . vertico-directory-delete-word))
+  ;; Tidy shadowed file names
+  :hook (rfn-eshadow-update-overlay . vertico-directory-tidy))
 
 
 (use-package consult
   :ensure t
   :after vertico
-  :demand t
 
   ;; Pulse the line after jumping, like `xref' does
   :hook (consult-after-jump . xref-pulse-momentarily)
