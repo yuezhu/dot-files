@@ -472,8 +472,8 @@ Only treat them as installed if present in `package-alist'."
   :if (memq window-system '(mac ns))
   :demand t
   :custom
-  ;; (mac-command-modifier 'meta)
-  ;; (mac-option-modifier 'super)
+  (mac-command-modifier 'meta)
+  (mac-option-modifier 'super)
   (ns-pop-up-frames nil))
 
 
