@@ -9,3 +9,6 @@
 [url "git@github.com:"]
 	insteadOf = git://github.com/
 	insteadOf = https://github.com/
+[delta]
+	side-by-side = true
+	navigate = true
