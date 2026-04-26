@@ -1,27 +1,11 @@
 [core]
 	editor = emacs --no-window-system --quick
-	pager = less --RAW-CONTROL-CHARS
 	fileMode = true
 	excludesfile = ~/.gitignore_global
 [user]
 	name = Yue Zhu
 	useConfigOnly = true
 	email = 1224535+yuezhu@users.noreply.github.com
-[diff]
-	tool = vimdiff
-[difftool]
-	prompt = false
-[push]
-	default = simple
-[rebase]
-	autosquash = true
-[remote]
-	pushDefault = origin
-[fetch]
-	prune = true
-	pruneTags = true
-[pull]
-	ff = only
 [url "git@github.com:"]
 	insteadOf = git://github.com/
 	insteadOf = https://github.com/
