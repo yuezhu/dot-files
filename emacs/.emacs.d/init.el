@@ -623,20 +623,26 @@ Only treat them as installed if present in `package-alist'."
   :bind
   ("M-R" . vertico-repeat)
 
-  :custom
+  ;; :custom
   ;; (vertico-scroll-margin 0) ;; Different scroll margin
   ;; (vertico-count 20) ;; Show more candidates
   ;; (vertico-resize t) ;; Grow and shrink the Vertico minibuffer
   ;; (vertico-cycle t) ;; Enable cycling for `vertico-next/previous'
+  )
+
+
+(use-package vertico-multiform
+  :after vertico
+  :ensure nil
+  :config
+  (vertico-multiform-mode)
+  :custom
   (vertico-multiform-commands
    '((execute-extended-command marginalia-mode)
      (consult-yank-pop indexed)
      (consult-yank-replace indexed)
      (consult-imenu (completion-ignore-case . t))
-     (consult-recent-file (completion-ignore-case . t))))
-
-  :config
-  (vertico-multiform-mode))
+     (consult-recent-file (completion-ignore-case . t)))))
 
 
 ;; Configure directory extension.
