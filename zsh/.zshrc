@@ -408,7 +408,7 @@ fi
 ## Pager
 
 export PAGER=less
-export LESS='--ignore-case --LONG-PROMPT --RAW-CONTROL-CHARS --window=-4 --mouse'
+export LESS='--ignore-case --LONG-PROMPT --RAW-CONTROL-CHARS --window=-4 --mouse --wheel-lines=3'
 export LESS_TERMCAP_so=$'\e[33m\e[7m'
 export LESS_TERMCAP_se=$'\e[0m'
 

@@ -480,9 +480,13 @@ Only treat them as installed if present in `package-alist'."
 ;;; Terminal Support
 
 (use-package mwheel
-  :if (display-graphic-p)
   :custom
-  (mouse-wheel-progressive-speed nil))
+  (mouse-wheel-progressive-speed nil)
+  :config
+  ;; Prepend 3 as the no-modifier wheel scroll amount (default is 1).
+  ;; mwheel uses the first non-cons element of mouse-wheel-scroll-amount
+  ;; as the unmodified amount; modifier-keyed alist entries are kept.
+  (add-to-list 'mouse-wheel-scroll-amount 3))
 
 
 ;; Enable mouse support in terminal Emacs via xterm mouse reporting.
