@@ -1307,7 +1307,8 @@ this is effective with some expand functions, eg.,
 
 (use-package crux
   :ensure t
-  :defer t)
+  :defer t
+  :bind ("C-c b" . crux-kill-buffer-truename))
 
 
 ;;; Spelling & Linting
