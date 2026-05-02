@@ -29,6 +29,15 @@ clipboard-paste-protection = true
 # (a protocol that prevents pasted text from being run as commands)
 clipboard-paste-bracketed-safe = true
 
+## Mouse
+# Multiplier applied to wheel deltas before forwarding to TUI apps (SGR mouse
+# mode) and before scrolling Ghostty's own scrollback. Default is 3.0, which
+# causes one physical wheel click to arrive as ~3 wheel events — this
+# compounds with per-event scroll amounts in tmux copy-mode and similar apps.
+# 1.0 forwards wheel events 1:1 with the OS delta (≈3 events per wheel click
+# on macOS), so per-event multipliers in TUI apps remain in control.
+mouse-scroll-multiplier = 1
+
 ## Scrollback
 # How many bytes of terminal output to keep for scrolling back (≈25 MB)
 scrollback-limit = 25000000
