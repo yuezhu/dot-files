@@ -2125,8 +2125,17 @@ This only affects the current markdown buffer, and does not add the
     :program "tidy"
     :args '("-indent" "-wrap" "0" "-omit" "-quiet" "-utf8" "-xml"))
   (reformatter-define python-format
-    :program "black"
-    :args '("-"))
+    :program "sh"
+    :args (list "-c"
+                ;; f is bound once and reused for both --stdin-filename args; ruff never
+                ;; reads this path — it uses it only to anchor pyproject.toml lookup and
+                ;; infer the language from the extension (any *.py name works for unsaved buffers)
+                (let ((f (shell-quote-argument
+                          (or (buffer-file-name) "stdin.py"))))
+                  (format
+                   "ruff check --select I --fix -e --stdin-filename %s - \
+| ruff format --stdin-filename %s -"
+                   f f))))
   (reformatter-define jsonnet-format
     :program "jsonnetfmt"
     :args '("-"))
