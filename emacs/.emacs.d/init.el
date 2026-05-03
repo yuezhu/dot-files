@@ -2100,18 +2100,16 @@ This only affects the current markdown buffer, and does not add the
 
 ;;; Code Formatting
 
+;; About deferred loading:
+;; `reformatter-define' is an autoloaded macro. In interpreted (non-byte-compiled)
+;; code, placing it inside `:config' would load the package eagerly at startup:
+;;   - use-package wraps `:config' in `eval-after-load', which builds an interpreted closure
+;;   - building the closure triggers `macroexpand-all' on the body
+;;   - `macroexpand-all' calls `autoload-do-load' on any autoloaded macro it encounters
+;; Using `:init' makes the eager load explicit rather than accidental.
 (use-package reformatter
   :ensure t
-  :defer t
-  :functions reformatter-define
-  :config
-  (add-to-list 'display-buffer-alist
-               `("\\`\\*.*-format errors\\*\\'"
-                 (display-buffer-at-bottom)
-                 (inhibit-same-window . t)
-                 (window-height . ,(apply-partially
-                                    #'fit-window-to-frame-fraction 10 0.5))))
-
+  :init
   (reformatter-define clang-format
     :program "clang-format"
     :args (list "--assume-filename" (buffer-file-name)))
@@ -2133,7 +2131,7 @@ This only affects the current markdown buffer, and does not add the
                 (let ((f (shell-quote-argument
                           (or (buffer-file-name) "stdin.py"))))
                   (format
-                   "ruff check --select I --fix -e --stdin-filename %s - \
+                   "ruff check --quiet --select I --fix -e --stdin-filename %s - \
 | ruff format --stdin-filename %s -"
                    f f))))
   (reformatter-define jsonnet-format
@@ -2144,30 +2142,35 @@ This only affects the current markdown buffer, and does not add the
     :args '("fmt" "-no-color" "-"))
 
   :hook
-  (c-mode
-   . (lambda ()
-       (bind-key "<f12>" #'clang-format-buffer c-mode-map)))
-  (c++-mode
-   . (lambda ()
-       (bind-key "<f12>" #'clang-format-buffer c++-mode-map)))
-  (java-mode
-   . (lambda ()
-       (bind-key "<f12>" #'google-java-format-buffer java-mode-map)))
-  (json-mode
-   . (lambda ()
-       (bind-key "<f12>" #'json-format-buffer json-mode-map)))
-  (nxml-mode
-   . (lambda ()
-       (bind-key "<f12>" #'nxml-format-buffer nxml-mode-map)))
-  (python-mode
-   . (lambda ()
-       (bind-key "<f12>" #'python-format-buffer python-mode-map)))
-  (jsonnet-mode
-   . (lambda ()
-       (bind-key "<f12>" #'jsonnet-format-buffer jsonnet-mode-map)))
-  (terraform-mode
-   . (lambda ()
-       (bind-key "<f12>" #'terraform-format-buffer terraform-mode-map))))
+  (((c-mode c++-mode c-ts-mode c++-ts-mode)
+    . (lambda ()
+        (bind-key "<f12>" #'clang-format-buffer (current-local-map))))
+   ((java-mode java-ts-mode)
+    . (lambda ()
+        (bind-key "<f12>" #'google-java-format-buffer (current-local-map))))
+   ((json-mode json-ts-mode)
+    . (lambda ()
+        (bind-key "<f12>" #'json-format-buffer (current-local-map))))
+   (nxml-mode
+    . (lambda ()
+        (bind-key "<f12>" #'nxml-format-buffer (current-local-map))))
+   ((python-mode python-ts-mode)
+    . (lambda ()
+        (bind-key "<f12>" #'python-format-buffer (current-local-map))))
+   (jsonnet-mode
+    . (lambda ()
+        (bind-key "<f12>" #'jsonnet-format-buffer (current-local-map))))
+   (terraform-mode
+    . (lambda ()
+        (bind-key "<f12>" #'terraform-format-buffer (current-local-map)))))
+
+  :config
+  (add-to-list 'display-buffer-alist
+               `("\\`\\*.*-format errors\\*\\'"
+                 (display-buffer-at-bottom)
+                 (inhibit-same-window . t)
+                 (window-height . ,(apply-partially
+                                    #'fit-window-to-frame-fraction 10 0.5)))))
 
 
 (use-package google-c-style
