@@ -2132,26 +2132,19 @@ This only affects the current markdown buffer, and does not add the
 
   :hook
   (((c-mode c++-mode c-ts-mode c++-ts-mode)
-    . (lambda ()
-        (bind-key "<f12>" #'clang-format-buffer (current-local-map))))
+    . (lambda () (local-set-key (kbd "<f12>") #'clang-format-buffer)))
    ((java-mode java-ts-mode)
-    . (lambda ()
-        (bind-key "<f12>" #'google-java-format-buffer (current-local-map))))
+    . (lambda () (local-set-key (kbd "<f12>") #'google-java-format-buffer)))
    ((json-mode json-ts-mode)
-    . (lambda ()
-        (bind-key "<f12>" #'json-format-buffer (current-local-map))))
+    . (lambda () (local-set-key (kbd "<f12>") #'json-format-buffer)))
    (nxml-mode
-    . (lambda ()
-        (bind-key "<f12>" #'nxml-format-buffer (current-local-map))))
+    . (lambda () (local-set-key (kbd "<f12>") #'nxml-format-buffer)))
    ((python-mode python-ts-mode)
-    . (lambda ()
-        (bind-key "<f12>" #'python-format-buffer (current-local-map))))
+    . (lambda () (local-set-key (kbd "<f12>") #'python-format-buffer)))
    (jsonnet-mode
-    . (lambda ()
-        (bind-key "<f12>" #'jsonnet-format-buffer (current-local-map))))
+    . (lambda () (local-set-key (kbd "<f12>") #'jsonnet-format-buffer)))
    (terraform-mode
-    . (lambda ()
-        (bind-key "<f12>" #'terraform-format-buffer (current-local-map)))))
+    . (lambda () (local-set-key (kbd "<f12>") #'terraform-format-buffer))))
 
   :config
   (add-to-list 'display-buffer-alist
