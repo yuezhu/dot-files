@@ -119,21 +119,6 @@ Only treat them as installed if present in `package-alist'."
                     (assq pkg package-alist)
                   (apply fn args)))))
 
-(defun package-upgrade-all--report (upgraded)
-  "Display message listing UPGRADED packages, or note if none were upgraded."
-  (if upgraded
-      (message "Upgraded: %s — restart Emacs to load new versions"
-               (mapconcat #'symbol-name upgraded ", "))
-    (message "No packages to upgrade")))
-
-(advice-add 'package-upgrade-all :around
-            (lambda (fn &rest args)
-              "Skip the confirmation prompt and display the names of upgraded packages."
-              (package-refresh-contents)
-              (let ((upgradeable (package--upgradeable-packages)))
-                (apply fn '(nil))
-                (package-upgrade-all--report upgradeable))))
-
 (add-to-list 'package-archives
              '("melpa" . "https://melpa.org/packages/") t)
 
@@ -185,7 +170,11 @@ Only treat them as installed if present in `package-alist'."
      ;; rather than calling this callback, so errors surface as
      ;; "error in process sentinel: ..." in the *Messages* buffer.
      (lambda (upgraded)
-       (package-upgrade-all--report upgraded)))))
+       (if upgraded
+           (message "Upgraded: %s — restart Emacs to load new versions"
+                    (mapconcat #'symbol-name upgraded ", "))
+         (message "No packages to upgrade"))))))
+
 
 
 ;;; Core Emacs Settings
