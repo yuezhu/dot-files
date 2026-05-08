@@ -1268,11 +1268,16 @@ this is effective with some expand functions, eg.,
 
 
 (use-package which-func
-  :defer 2
+  :defer t
   :custom
   (which-func-unknown "n/a")
   :config
   (which-function-mode t))
+
+
+(use-package breadcrumb
+  :ensure t
+  :hook ((prog-mode text-mode) . breadcrumb-local-mode))
 
 
 (use-package abbrev
