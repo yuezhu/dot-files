@@ -1,6 +1,6 @@
-;;; init.el --- ... -*- lexical-binding: t -*-
+;;; init.el --- ... -*- lexical-binding: t; coding: utf-8-emacs -*-
 
-;;; Startup & Performance
+;;; Foundation: Startup, Packages & Environment
 
 ;; Used to report time spent loading this module
 (defconst emacs-start-time (current-time))
@@ -85,9 +85,6 @@ Usage:
                 `((name . ,(intern (format "debug-%s-load" name)))))))
 
 
-;; (trace-feature-load 'project)
-
-
 
 (defun fit-window-to-frame-fraction (min-height-lines max-height-fraction window)
   "Fit WINDOW to its buffer, with height bounded by MIN-HEIGHT-LINES and MAX-HEIGHT-FRACTION.
@@ -100,8 +97,6 @@ MAX-HEIGHT-FRACTION is the maximum height as a fraction of the frame height
                         (floor (* (frame-height) max-height-fraction))
                         min-height-lines))
 
-
-;;; Package Management
 
 (require 'package)
 
@@ -176,9 +171,6 @@ Only treat them as installed if present in `package-alist'."
          (message "No packages to upgrade"))))))
 
 
-
-;;; Core Emacs Settings
-
 ;; (use-package emacs ...) is a common idiom for configuring built-in
 ;; Emacs settings that don't belong to any specific package.  Since
 ;; "emacs" is not a real package, `use-package' treats it as always
@@ -191,7 +183,7 @@ Only treat them as installed if present in `package-alist'."
   :diminish auto-fill-function
 
   :hook
-  ((prog-mode protobuf-mode) . turn-on-auto-fill)
+  (prog-mode . turn-on-auto-fill)
   :hook
   (text-mode . visual-line-mode)
 
@@ -395,66 +387,30 @@ Only treat them as installed if present in `package-alist'."
                  (inhibit-same-window . t))))
 
 
-;;; User Interface
-
-(use-package hl-line
-  :defer t
-  :hook
-  ((compilation-mode
-    gnus-mode
-    ibuffer-mode
-    magit-mode
-    occur-mode
-    dired-mode)
-   . hl-line-mode))
-
-
-(use-package goto-addr
-  :defer t
-  :hook
-  (prog-mode . goto-address-prog-mode)
-  :hook
-  ((text-mode magit-process-mode) . goto-address-mode))
-
-
-(use-package display-fill-column-indicator
-  :defer t
-  ;; :hook
-  ;; (auto-fill-mode
-  ;;  . (lambda ()
-  ;;      (display-fill-column-indicator-mode
-  ;;       (if auto-fill-function 1 -1))))
-  )
-
-
-(use-package display-line-numbers
-  :defer t
-  :hook diff-mode)
-
-
-(use-package paren
-  :defer t
-  :custom
-  (show-paren-mode t)
-  (show-paren-delay 0)
-  (show-paren-style 'parentheses))
-
-
-(use-package which-key
-  :defer 2
-  :diminish
-  :config
-  (which-key-mode))
-
-
-;;; macOS Integration
-
 (use-package exec-path-from-shell
   :if (memq window-system '(mac ns))
   :ensure t
   :demand t
   :config
-  (exec-path-from-shell-initialize))
+  ;; Spawning a login shell to read PATH/MANPATH costs ~100-500ms on macOS
+  ;; GUI startup. Cache the result and reload it on subsequent starts;
+  ;; regenerate when any zsh startup file is touched. Cache file is per-host
+  ;; so paths from different machines (e.g. /opt/homebrew vs /usr/local) do
+  ;; not cross-contaminate when dotfiles are stowed across hosts. Delete the
+  ;; cache file to force a refresh.
+  (let ((cache-file (expand-file-name (format "shell-env-%s.el" (system-name))
+                                      user-emacs-directory))
+        (zsh-files '("~/.zshenv" "~/.zprofile" "~/.zshrc")))
+    (if (not (seq-some (lambda (f) (file-newer-than-file-p f cache-file))
+                       zsh-files))
+        (load cache-file nil :nomessage)
+      (exec-path-from-shell-initialize)
+      (with-temp-file cache-file
+        (insert ";;; -*- coding: utf-8-emacs; mode: lisp-data -*-\n"
+                ";; Auto-generated cache of shell env vars; safe to delete.\n")
+        (dolist (var exec-path-from-shell-variables)
+          (insert (format "(setenv %S %S)\n" var (getenv var))))
+        (insert (format "(setq exec-path '%S)\n" exec-path))))))
 
 
 (use-package ns-win
@@ -465,8 +421,6 @@ Only treat them as installed if present in `package-alist'."
   (mac-option-modifier 'super)
   (ns-pop-up-frames nil))
 
-
-;;; Terminal Support
 
 (use-package mwheel
   :custom
@@ -539,7 +493,47 @@ Only treat them as installed if present in `package-alist'."
   (set-display-table-slot standard-display-table 'vertical-border ?┃))
 
 
-;;; Window Management
+;;; Interface: Windows, Frames & Appearance
+
+(use-package hl-line
+  :defer t
+  :hook
+  ((compilation-mode
+    gnus-mode
+    ibuffer-mode
+    magit-mode
+    occur-mode
+    dired-mode)
+   . hl-line-mode))
+
+
+(use-package goto-addr
+  :defer t
+  :hook
+  (prog-mode . goto-address-prog-mode)
+  :hook
+  ((text-mode magit-process-mode) . goto-address-mode))
+
+
+(use-package display-line-numbers
+  :defer t
+  :hook diff-mode)
+
+
+(use-package paren
+  :defer t
+  :custom
+  (show-paren-mode t)
+  (show-paren-delay 0)
+  (show-paren-style 'parentheses))
+
+
+(use-package which-key
+  :defer 2
+  :diminish
+  :config
+  (which-key-mode))
+
 
 ;; Loaded in loadup.el
 (use-package window
@@ -585,7 +579,71 @@ Only treat them as installed if present in `package-alist'."
    ((t (:inherit aw-leading-char-face :weight bold :height 3.0)))))
 
 
-;;; Minibuffer & Completion
+(use-package zenburn-theme
+  :disabled
+  :ensure t
+  :demand t
+  :init
+  (unless (display-graphic-p)
+    (setq zenburn-override-colors-alist
+          '(("zenburn-bg" . "unspecified-bg")
+            ("zenburn-fg" . "unspecified-fg"))))
+
+  :config
+  ;; scale headings in org-mode
+  (setq zenburn-scale-org-headlines t)
+  ;; scale headings in outline-mode
+  (setq zenburn-scale-outline-headlines t)
+
+  (load-theme 'zenburn t)
+  ;; (zenburn-with-color-variables
+  ;;  (custom-set-faces
+  ;;   '(eglot-mode-line ((t (:inherit font-lock-constant-face :weight normal))))))
+  )
+
+
+(use-package color-theme-sanityinc-tomorrow
+  :ensure t
+  :disabled t
+  :config
+  (load-theme 'sanityinc-tomorrow-bright t)
+  ;; (set-face-attribute 'font-lock-comment-delimiter-face nil :slant 'normal)
+  ;; (set-face-attribute 'font-lock-comment-face nil :slant 'normal)
+  ;; (unless (display-graphic-p)
+  ;;   (set-face-attribute 'default nil :background "unspecified-bg"))
+  :custom
+  (custom-safe-themes t))
+
+
+(use-package modus-themes
+  :ensure t
+  :demand t
+  :config
+  (unless (display-graphic-p)
+    (setq modus-themes-common-palette-overrides
+          `((border-mode-line-active unspecified)
+            (border-mode-line-inactive unspecified))))
+  (modus-themes-load-theme 'modus-vivendi)
+  :custom
+  (custom-safe-themes t))
+
+
+(when (display-graphic-p)
+  (add-hook 'after-init-hook
+            #'(lambda ()
+                (cond
+                 ((eq system-type 'gnu/linux)
+                  (set-face-attribute
+                   'default nil :font
+                   "-*-Hack-regular-normal-normal-*-16-*-*-*-*-0-iso10646-1"))
+                 ((eq system-type 'darwin)
+                  (set-face-attribute
+                   'default nil :font
+                   (font-spec :family "JetBrains Mono" :size 14))))
+                (set-frame-parameter nil 'fullscreen 'maximized))))
+
+
+;;; Productivity: Completion, Search, VCS, Shell & Org
 
 (use-package orderless
   :ensure t
@@ -912,8 +970,6 @@ this is effective with some expand functions, eg.,
                   (apply func args)))))
 
 
-;;; Search & Navigation
-
 ;; Loaded in loadup.el
 (use-package isearch
   :bind (:map isearch-mode-map
@@ -1015,410 +1071,6 @@ this is effective with some expand functions, eg.,
   (project-switch-commands 'project-dired))
 
 
-;;; File & Buffer Management
-
-(use-package dired
-  :defer t
-
-  :preface
-  (defun dired-find-directory (dir)
-    (interactive "DFind directory: ")
-    (let ((orig (current-buffer)))
-      (dired dir)
-      (kill-buffer orig)))
-
-  ;; https://github.com/jwiegley/dot-emacs/blob/master/init.el
-  (defun dired-next-window ()
-    (interactive)
-    (let ((next (car (cl-remove-if-not (lambda (wind)
-                                         (with-current-buffer (window-buffer wind)
-                                           (eq major-mode 'dired-mode)))
-                                       (cdr (window-list))))))
-      (when next
-        (select-window next))))
-
-  (defun dired-find-file-reuse-buffer ()
-    "Replace current buffer if file is a directory."
-    (interactive)
-    (let ((orig (current-buffer))
-          (filename (dired-get-file-for-visit)))
-      (dired-find-file)
-      (when (and (file-directory-p filename)
-                 (not (eq (current-buffer) orig)))
-        (kill-buffer orig))))
-
-  (defun dired-up-directory-reuse-buffer ()
-    "Replace current buffer if file is a directory."
-    (interactive)
-    (let ((orig (current-buffer)))
-      (dired-up-directory)
-      (kill-buffer orig)))
-
-  :commands (dired-get-file-for-visit
-             dired-find-file
-             dired-up-directory
-             dired-hide-details-mode)
-
-  :bind (:map dired-mode-map
-              ("/"     . dired-find-directory)
-              ("<tab>" . dired-next-window)
-              ("M-p"   . dired-up-directory-reuse-buffer)
-              ("M-n"   . dired-find-file-reuse-buffer)
-              ("!"     . crux-open-with))
-
-  :hook
-  (dired-mode
-   . (lambda ()
-       ;; (dired-hide-details-mode)
-       (setq-local auto-revert-verbose nil)))
-
-  :custom
-  (insert-directory-program
-   (cond
-    ((and (eq system-type 'darwin)
-          (executable-find "gls"))
-     "gls")
-    ((eq system-type 'darwin)
-     "ls")))
-  (dired-listing-switches
-   (cond
-    ((eq system-type 'gnu/linux)
-     "-Ahl --group-directories-first")
-    ((eq system-type 'darwin)
-     (if (string-suffix-p "gls" insert-directory-program)
-         "-Alh --group-directories-first"
-       "-Ahl"))))
-  (dired-dwim-target t)
-  (dired-isearch-filenames 'dwim)
-  (dired-omit-files "^\\.?#\\|^\\.$\\|^\\.\\.$\\|^\\..+$")
-  (dired-omit-size-limit nil)
-  (dired-omit-verbose nil)
-  (dired-recursive-copies 'always)
-  (dired-recursive-deletes 'always))
-
-
-(use-package diredfl
-  :ensure t
-  :defer t
-  :hook
-  (dired-mode . diredfl-mode))
-
-
-(use-package dired-x
-  :disabled
-  :defer t
-  :hook
-  (dired-mode . dired-omit-mode))
-
-
-(use-package ibuffer
-  :defer t
-
-  :bind ("C-x C-b" . ibuffer)
-
-  :hook
-  (ibuffer-mode . ibuffer-auto-mode)
-  (ibuffer . (lambda ()
-               (ibuffer-vc-set-filter-groups-by-vc-root)
-               (unless (eq ibuffer-sorting-mode 'filename/process)
-                 (ibuffer-do-sort-by-filename/process))))
-
-  :custom
-  (ibuffer-filter-group-name-face 'font-lock-doc-face)
-  (ibuffer-formats '((mark modified read-only vc-status-mini " "
-                           (name 32 32 :left :elide)
-                           " "
-                           (size-h 9 -1 :right)
-                           " "
-                           (mode 16 16 :left :elide)
-                           " "
-                           (vc-status 16 -1 :left)
-                           " " filename-and-process)))
-
-  :config
-  (define-ibuffer-column size-h
-    (:name "Size" :inline t)
-    (cond
-     ((> (buffer-size) 1000000) (format "%7.3fM" (/ (buffer-size) 1048576.0)))
-     ((> (buffer-size) 1000) (format "%7.3fK" (/ (buffer-size) 1024.0)))
-     (t (format "%8d" (buffer-size))))))
-
-
-(use-package ibuffer-vc
-  :ensure t
-  :after ibuffer
-  :demand t)
-
-
-(use-package recentf
-  :defer 2
-  :preface
-  ;; https://github.com/jwiegley/dot-emacs/blob/master/init.el
-  (defun recentf-add-dired-directory ()
-    (when (and dired-directory
-               (file-directory-p dired-directory)
-               (not (string= "/" dired-directory)))
-      (recentf-add-file (directory-file-name dired-directory))))
-
-  :custom
-  (recentf-auto-cleanup 60)
-  (recentf-exclude
-   '("\\`out\\'"
-     "\\.log\\'"
-     "\\.el\\.gz\\'"
-     "/\\.emacs\\.d/elpa/.*-\\(autoloads\\|pkg\\)\\.el\\'"
-     "/\\.emacs\\.d/\\(auto-save-list\\|projects\\|recentf\\|snippets\\|tramp\\|var\\)"
-     "/\\.git/COMMIT_EDITMSG\\'"))
-  (recentf-filename-handlers '(abbreviate-file-name))
-  (recentf-max-saved-items 2000)
-
-  :hook
-  (dired-mode . recentf-add-dired-directory)
-
-  :commands (recentf-mode
-             recentf-add-file
-             recentf-save-list
-             recentf-string-member)
-
-  :config
-  (let ((inhibit-message t))
-    (recentf-mode 1))
-
-  (advice-add 'recentf-cleanup :around
-              (lambda (func &rest args)
-                "Do not print to the echo area when cleaning up
-`recentf-list'."
-                (let ((inhibit-message t))
-                  (apply func args)))))
-
-
-(use-package tramp-sh
-  :defer t
-
-  :init
-  ;; https://www.gnu.org/software/emacs/manual/html_node/tramp/Frequently-Asked-Questions.html
-  (setq
-   vc-ignore-dir-regexp
-   (format "\\(%s\\)\\|\\(%s\\)"
-           vc-ignore-dir-regexp
-           tramp-file-name-regexp)
-   tramp-connection-timeout 15
-   tramp-default-method "ssh"
-   tramp-use-ssh-controlmaster-options nil))
-
-
-;; Loaded in loadup.el
-(use-package select
-  :custom
-  (select-enable-clipboard t))
-
-
-;; Loaded in loadup.el
-(use-package uniquify
-  :custom
-  (uniquify-after-kill-buffer-p t)
-  (uniquify-buffer-name-style
-   'post-forward-angle-brackets nil (uniquify)))
-
-
-;;; Editing Helpers
-
-(use-package electric
-  :defer t
-  :custom
-  (electric-indent-mode t))
-
-
-(use-package elec-pair
-  :defer t
-  :custom
-  (electric-pair-mode t))
-
-
-(use-package ediff-wind
-  :defer t
-  :custom
-  (ediff-split-window-function 'split-window-horizontally)
-  (ediff-window-setup-function 'ediff-setup-windows-plain))
-
-
-(use-package ialign
-  :ensure t
-  :defer t
-  :bind ("C-c |" . ialign))
-
-
-(use-package unfill
-  :ensure t
-  :defer t
-  :bind ([remap fill-paragraph] . unfill-toggle))
-
-
-(use-package hideshow
-  :defer t
-  :diminish hs-minor-mode
-  :hook (prog-mode . hs-minor-mode))
-
-
-(use-package eldoc
-  :defer 2
-  :diminish
-  :config
-  (global-eldoc-mode t))
-
-
-(use-package which-func
-  :defer t
-  :custom
-  (which-func-unknown "n/a")
-  :config
-  (which-function-mode t))
-
-
-(use-package breadcrumb
-  :ensure t
-  :hook ((prog-mode text-mode) . breadcrumb-local-mode))
-
-
-(use-package abbrev
-  :defer t
-  :diminish
-  :hook
-  ;; ((text-mode prog-mode) . abbrev-mode)
-  (expand-load
-   . (lambda ()
-       (add-hook 'expand-expand-hook #'indent-according-to-mode)
-       (add-hook 'expand-jump-hook #'indent-according-to-mode)))
-  :commands abbrev-mode ;; `cc-mode' turns on `abbrev-mode'.
-
-  :custom
-  (save-abbrevs 'silently)
-
-  :config
-  (if (file-exists-p abbrev-file-name)
-      (quietly-read-abbrev-file)))
-
-
-(use-package crux
-  :ensure t
-  :defer t
-  :bind ("C-c b" . crux-kill-buffer-truename))
-
-
-;;; Spelling & Linting
-
-(use-package ispell
-  :defer t
-
-  :custom
-  (ispell-program-name "hunspell")
-  (ispell-personal-dictionary "~/.emacs.d/ispell-personal-dictionary")
-  (ispell-silently-savep t)
-  (ispell-local-dictionary-alist
-   '(("en_US"
-      "[[:alpha:]]" "[^[:alpha:]]" "[']" nil
-      ("-d" "en_US") nil utf-8)))
-  (ispell-local-dictionary "en_US")
-
-  :config
-  ;; Hunspell cannot create the personal dictionary file if it does not exist.
-  (unless (file-exists-p ispell-personal-dictionary)
-    (make-empty-file ispell-personal-dictionary)))
-
-
-(use-package flyspell
-  :defer t
-  :bind ("C-c s b" . flyspell-buffer)
-
-  :preface
-  ;; https://github.com/abo-abo/oremacs/blob/github/modes/ora-flyspell.el
-  (defun flyspell-ignore-http-and-https ()
-    "Function used for `flyspell-generic-check-word-predicate' to
-ignore stuff starting with \"http\" or \"https\"."
-    (save-excursion
-      (forward-whitespace -1)
-      (not (looking-at "[\t ]+https?\\b"))))
-
-  :hook
-  (text-mode . flyspell-mode)
-
-  :custom
-  (flyspell-sort-corrections t)
-
-  :config
-  (dolist (mode '(text-mode org-mode)) ;; need to specify all derived modes
-    (put mode 'flyspell-mode-predicate #'flyspell-ignore-http-and-https)))
-
-
-(use-package flyspell-correct
-  :ensure t
-  :after flyspell
-  :defer t
-  :bind (:map flyspell-mode-map
-              ("C-c s w" . flyspell-correct-wrapper)))
-
-
-(use-package flymake
-  :defer t
-  :hook (sh-mode . flymake-mode))
-
-
-(use-package flycheck
-  :disabled ;; 2023-08-12 use `flymake'
-  :defer 2
-  :custom
-  (flycheck-disabled-checkers
-   '(c/c++-cppcheck
-     c/c++-gcc
-     go-build
-     go-errcheck
-     go-gofmt
-     go-golint
-     go-staticcheck
-     go-test
-     go-unconvert
-     go-vet
-     json-jsonlint
-     json-python-json
-     python-mypy
-     python-pycompile
-     python-pyright
-     ruby-rubocop
-     sh-bash
-     sh-posix-bash
-     sh-posix-dash
-     sh-zsh
-     yaml-jsyaml
-     yaml-ruby
-     emacs-lisp-checkdoc))
-  :config
-  (global-flycheck-mode 1))
-
-
-(use-package whitespace
-  :defer t
-  :bind (("C-c w m" . whitespace-mode)
-         ("C-c w r" . whitespace-report)
-         ("C-c w c" . whitespace-cleanup))
-
-  :diminish (global-whitespace-mode
-             whitespace-mode
-             whitespace-newline-mode)
-
-  :hook ((conf-mode
-          json-mode
-          ssh-config-mode
-          yaml-mode
-          makefile-mode)
-         . whitespace-mode)
-
-  :custom
-  (whitespace-line-column 100)
-  (whitespace-style '(face trailing tabs)))
-
-
-;;; Version Control
-
 (use-package diff-hl
   :ensure t
   :defer t
@@ -1463,8 +1115,6 @@ ignore stuff starting with \"http\" or \"https\"."
   (magit-commit-show-diff nil))
 
 
-;;; AI Assistance
-
 (use-package copilot
   :ensure t
   :defer t
@@ -1478,8 +1128,6 @@ ignore stuff starting with \"http\" or \"https\"."
               ("M-n" . copilot-next-completion)
               ("M-p" . copilot-previous-completion)))
 
-
-;;; Compilation & Shell
 
 (use-package compile
   :defer t
@@ -1569,8 +1217,6 @@ ignore stuff starting with \"http\" or \"https\"."
   :config
   (setq ps-print-region-function 'ps-spool-to-pdf))
 
-
-;;; Org Mode
 
 (use-package org
   :ensure t
@@ -1720,10 +1366,10 @@ If no ID exists, this does nothing."
       :publishing-function org-publish-attachment
       :publishing-directory "~/.www/org-roam/"
       :recursive t)
-     ("org-roam" :components ("org-file" "org-static")))
+     ("org-roam" :components ("org-file" "org-static"))))
 
-   (org-todo-keywords
-    '((sequence "TODO(t)" "IN-PROGRESS(i)" "WAITING(w)" "|" "DONE(d)" "CANCELLED(c)"))))
+  (org-todo-keywords
+   '((sequence "TODO(t)" "IN-PROGRESS(i)" "WAITING(w)" "|" "DONE(d)" "CANCELLED(c)")))
 
   :config
   (make-directory org-directory t)
@@ -1775,17 +1421,30 @@ If no ID exists, this does nothing."
   :after org
   :defer t
   :preface
-  (defun org-tempo-cleanup-angle (result)
-    "Delete trailing > left by electric-pair after org-tempo expansion."
+  (defun org-tempo-post-expand (result)
+    "Clean up trailing > from electric-pair and trigger completion after `org-tempo' expansion.
+RESULT is the return value of `org-tempo-complete-tag' (t on success, nil on failure)."
+    ;; This is a `:filter-return' advice, so its return value replaces
+    ;; `org-tempo-complete-tag's.  That function is on
+    ;; `org-tab-before-tab-emulation-hook', which `org-cycle' (org-mode's TAB
+    ;; command) runs via `run-hook-with-args-until-success' — a macro that stops
+    ;; at the first non-nil return, short-circuiting further TAB processing.
+    ;;
+    ;; On success (result = t): remove the trailing >, invoke
+    ;; `completion-at-point' to trigger the corfu menu, and return t to
+    ;; short-circuit the hook.
+    ;; On failure (result = nil): return nil so TAB falls through normally.
     (when result
       (save-excursion
         (let ((bound (save-excursion (forward-line 3) (point))))
           (when (re-search-forward "^#\\+end_[a-z]+" bound t)
             (when (eq (char-after) ?>)
-              (delete-char 1)))))))
+              (delete-char 1)))))
+      (completion-at-point))
+    result)
 
   :config
-  (advice-add 'org-tempo-complete-tag :filter-return #'org-tempo-cleanup-angle))
+  (advice-add 'org-tempo-complete-tag :filter-return #'org-tempo-post-expand))
 
 
 ;; `org-make-toc-mode' is a minor mode that automatically generates a table of
@@ -2016,7 +1675,7 @@ If no ID exists, this does nothing."
   :defer t)
 
 
-;;; Markup & Documentation
+;;; Programming: Languages, LSP & Code Tooling
 
 (use-package markdown-mode
   :ensure t
@@ -2049,8 +1708,6 @@ This only affects the current markdown buffer, and does not add the
   :ensure t
   :defer t)
 
-
-;;; Code Structure
 
 (use-package paredit
   :disabled
@@ -2091,8 +1748,6 @@ This only affects the current markdown buffer, and does not add the
   (put 'hes-escape-sequence-face 'face-alias 'font-lock-builtin-face)
   (push `(json-mode . ,hes-js-escape-sequence-re) hes-mode-alist))
 
-
-;;; Code Formatting
 
 ;; About deferred loading:
 ;; `reformatter-define' is an autoloaded macro. In interpreted (non-byte-compiled)
@@ -2169,8 +1824,6 @@ This only affects the current markdown buffer, and does not add the
        (google-set-c-style)
        (google-make-newline-indent))))
 
-
-;;; LSP
 
 (use-package eglot
   :defer t
@@ -2298,8 +1951,6 @@ Falls back to `%s' if any grammar install is declined." to from)
   (treesit-font-lock-level 4))
 
 
-;;; Programming Languages
-
 (use-package prog-mode
   :defer t
   :preface
@@ -2402,14 +2053,15 @@ If no symbol at point, quit the *Help* window if visible."
 
 
 (use-package cwarn
+  :defer t
   :commands cwarn-mode
   :diminish)
 
 
 (use-package python
+  :defer t
   :interpreter ("python" . python-mode)
-  :mode ("\\.pyx?\\'" . python-mode)
-  :defer t)
+  :mode ("\\.pyx?\\'" . python-mode))
 
 
 (use-package nxml-mode
@@ -2420,7 +2072,6 @@ If no symbol at point, quit the *Help* window if visible."
        (setq-local indent-line-function #'nxml-indent-line)
        (when (and
               buffer-file-name
-              (file-exists-p buffer-file-name)
               (string= (file-name-extension
                         (file-name-nondirectory buffer-file-name))
                        "plist"))
@@ -2591,73 +2242,343 @@ If no symbol at point, quit the *Help* window if visible."
   (plantuml-indent-level 2))
 
 
-;;; Theme & Appearance
+;;; Editing: Files, Buffers & Text Manipulation
 
-(use-package zenburn-theme
+(use-package dired
+  :defer t
+
+  :preface
+  (defun dired-find-directory (dir)
+    (interactive "DFind directory: ")
+    (let ((orig (current-buffer)))
+      (dired dir)
+      (kill-buffer orig)))
+
+  ;; https://github.com/jwiegley/dot-emacs/blob/master/init.el
+  (defun dired-next-window ()
+    (interactive)
+    (let ((next (car (cl-remove-if-not (lambda (wind)
+                                         (with-current-buffer (window-buffer wind)
+                                           (eq major-mode 'dired-mode)))
+                                       (cdr (window-list))))))
+      (when next
+        (select-window next))))
+
+  :commands (dired-get-file-for-visit
+             dired-hide-details-mode)
+
+  :bind (:map dired-mode-map
+              ("/"     . dired-find-directory)
+              ("<tab>" . dired-next-window)
+              ("M-p"   . dired-up-directory)
+              ("M-n"   . dired-find-file)
+              ("!"     . crux-open-with))
+
+  :hook
+  (dired-mode
+   . (lambda ()
+       ;; (dired-hide-details-mode)
+       (setq-local auto-revert-verbose nil)))
+
+  :custom
+  (insert-directory-program
+   (cond
+    ((and (eq system-type 'darwin)
+          (executable-find "gls"))
+     "gls")
+    ((eq system-type 'darwin)
+     "ls")))
+  (dired-listing-switches
+   (cond
+    ((eq system-type 'gnu/linux)
+     "-Ahl --group-directories-first")
+    ((eq system-type 'darwin)
+     (if (string-suffix-p "gls" insert-directory-program)
+         "-Alh --group-directories-first"
+       "-Ahl"))))
+  ;; Kill the current dired buffer when navigating into a subdirectory
+  ;; or up to a parent (Emacs 28+).
+  (dired-kill-when-opening-new-dired-buffer t)
+  (dired-dwim-target t)
+  (dired-isearch-filenames 'dwim)
+  (dired-omit-files "^\\.?#\\|^\\.$\\|^\\.\\.$\\|^\\..+$")
+  (dired-omit-size-limit nil)
+  (dired-omit-verbose nil)
+  (dired-recursive-copies 'always)
+  (dired-recursive-deletes 'always))
+
+
+(use-package diredfl
+  :ensure t
+  :defer t
+  :hook
+  (dired-mode . diredfl-mode))
+
+
+(use-package dired-x
   :disabled
+  :defer t
+  :hook
+  (dired-mode . dired-omit-mode))
+
+
+(use-package ibuffer
+  :defer t
+
+  :bind ("C-x C-b" . ibuffer)
+
+  :hook
+  (ibuffer-mode . ibuffer-auto-mode)
+  (ibuffer . (lambda ()
+               (ibuffer-vc-set-filter-groups-by-vc-root)
+               (unless (eq ibuffer-sorting-mode 'filename/process)
+                 (ibuffer-do-sort-by-filename/process))))
+
+  :custom
+  (ibuffer-filter-group-name-face 'font-lock-doc-face)
+  (ibuffer-formats '((mark modified read-only vc-status-mini " "
+                           (name 32 32 :left :elide)
+                           " "
+                           (size-h 9 -1 :right)
+                           " "
+                           (mode 16 16 :left :elide)
+                           " "
+                           (vc-status 16 -1 :left)
+                           " " filename-and-process)))
+
+  :config
+  (define-ibuffer-column size-h
+    (:name "Size" :inline t)
+    (cond
+     ((> (buffer-size) 1000000) (format "%7.3fM" (/ (buffer-size) 1048576.0)))
+     ((> (buffer-size) 1000) (format "%7.3fK" (/ (buffer-size) 1024.0)))
+     (t (format "%8d" (buffer-size))))))
+
+
+(use-package ibuffer-vc
   :ensure t
-  :demand t
+  :after ibuffer
+  :demand t)
+
+
+(use-package recentf
+  :defer 2
+  :preface
+  ;; https://github.com/jwiegley/dot-emacs/blob/master/init.el
+  (defun recentf-add-dired-directory ()
+    (when (and dired-directory
+               (file-directory-p dired-directory)
+               (not (string= "/" dired-directory)))
+      (recentf-add-file (directory-file-name dired-directory))))
+
+  :custom
+  (recentf-auto-cleanup 60)
+  (recentf-exclude
+   '("\\`out\\'"
+     "\\.log\\'"
+     "\\.el\\.gz\\'"
+     "/\\.emacs\\.d/elpa/.*-\\(autoloads\\|pkg\\)\\.el\\'"
+     "/\\.emacs\\.d/\\(auto-save-list\\|projects\\|recentf\\|snippets\\|tramp\\|var\\)"
+     "/\\.git/COMMIT_EDITMSG\\'"))
+  (recentf-filename-handlers '(abbreviate-file-name))
+  (recentf-max-saved-items 2000)
+
+  :hook
+  (dired-mode . recentf-add-dired-directory)
+
+  :commands (recentf-mode
+             recentf-add-file
+             recentf-save-list
+             recentf-string-member)
+
+  :config
+  (let ((inhibit-message t))
+    (recentf-mode 1))
+
+  (advice-add 'recentf-cleanup :around
+              (lambda (func &rest args)
+                "Do not print to the echo area when cleaning up
+`recentf-list'."
+                (let ((inhibit-message t))
+                  (apply func args)))))
+
+
+(use-package tramp-sh
+  :defer t
+
   :init
-  (unless (display-graphic-p)
-    (setq zenburn-override-colors-alist
-          '(("zenburn-bg" . "unspecified-bg")
-            ("zenburn-fg" . "unspecified-fg"))))
-
-  :config
-  ;; scale headings in org-mode
-  (setq zenburn-scale-org-headlines t)
-  ;; scale headings in outline-mode
-  (setq zenburn-scale-outline-headlines t)
-
-  (load-theme 'zenburn t)
-  ;; (zenburn-with-color-variables
-  ;;  (custom-set-faces
-  ;;   '(eglot-mode-line ((t (:inherit font-lock-constant-face :weight normal))))))
-  )
+  ;; https://www.gnu.org/software/emacs/manual/html_node/tramp/Frequently-Asked-Questions.html
+  (setq
+   vc-ignore-dir-regexp
+   (format "\\(%s\\)\\|\\(%s\\)"
+           vc-ignore-dir-regexp
+           tramp-file-name-regexp)
+   tramp-connection-timeout 15
+   tramp-default-method "ssh"
+   tramp-use-ssh-controlmaster-options nil))
 
 
-(use-package color-theme-sanityinc-tomorrow
-  :ensure t
-  :disabled t
-  :config
-  (load-theme 'sanityinc-tomorrow-bright t)
-  ;; (set-face-attribute 'font-lock-comment-delimiter-face nil :slant 'normal)
-  ;; (set-face-attribute 'font-lock-comment-face nil :slant 'normal)
-  ;; (unless (display-graphic-p)
-  ;;   (set-face-attribute 'default nil :background "unspecified-bg"))
-  :custom
-  (custom-safe-themes t))
-
-
-(use-package modus-themes
-  :ensure t
+;; Loaded in loadup.el
+(use-package select
   :demand t
-  :config
-  (unless (display-graphic-p)
-    (setq modus-themes-common-palette-overrides
-          `((border-mode-line-active unspecified)
-            (border-mode-line-inactive unspecified))))
-  (modus-themes-load-theme 'modus-vivendi)
   :custom
-  (custom-safe-themes t))
+  (select-enable-clipboard t))
 
 
-(when (display-graphic-p)
-  (add-hook 'after-init-hook
-            #'(lambda ()
-                (cond
-                 ((eq system-type 'gnu/linux)
-                  (set-face-attribute
-                   'default nil :font
-                   "-*-Hack-regular-normal-normal-*-16-*-*-*-*-0-iso10646-1"))
-                 ((eq system-type 'darwin)
-                  (set-face-attribute
-                   'default nil :font
-                   (font-spec :family "JetBrains Mono" :size 14))))
-                (set-frame-parameter nil 'fullscreen 'maximized))))
+;; Loaded in loadup.el
+(use-package uniquify
+  :demand t
+  :custom
+  (uniquify-after-kill-buffer-p t)
+  (uniquify-buffer-name-style
+   'post-forward-angle-brackets nil (uniquify)))
 
 
-;;; Custom Functions & Keybindings
+(use-package electric
+  :defer t
+  :custom
+  (electric-indent-mode t))
+
+
+(use-package elec-pair
+  :defer t
+  :custom
+  (electric-pair-mode t))
+
+
+(use-package ediff-wind
+  :defer t
+  :custom
+  (ediff-split-window-function 'split-window-horizontally)
+  (ediff-window-setup-function 'ediff-setup-windows-plain))
+
+
+(use-package ialign
+  :ensure t
+  :defer t
+  :bind ("C-c |" . ialign))
+
+
+(use-package unfill
+  :ensure t
+  :defer t
+  :bind ([remap fill-paragraph] . unfill-toggle))
+
+
+(use-package hideshow
+  :defer t
+  :diminish hs-minor-mode
+  :hook (prog-mode . hs-minor-mode))
+
+
+(use-package eldoc
+  :defer 2
+  :diminish
+  :config
+  (global-eldoc-mode t))
+
+
+(use-package which-func
+  :defer t
+  :custom
+  (which-func-unknown "n/a")
+  :config
+  (which-function-mode t))
+
+
+(use-package breadcrumb
+  :ensure t
+  :hook ((prog-mode text-mode) . breadcrumb-local-mode))
+
+
+(use-package abbrev
+  :defer t
+  :diminish
+  :hook
+  ;; ((text-mode prog-mode) . abbrev-mode)
+  (expand-load
+   . (lambda ()
+       (add-hook 'expand-expand-hook #'indent-according-to-mode)
+       (add-hook 'expand-jump-hook #'indent-according-to-mode)))
+  :commands abbrev-mode ;; `cc-mode' turns on `abbrev-mode'.
+
+  :custom
+  (save-abbrevs 'silently)
+
+  :config
+  (if (file-exists-p abbrev-file-name)
+      (quietly-read-abbrev-file)))
+
+
+(use-package crux
+  :ensure t
+  :defer t
+  :bind ("C-c b" . crux-kill-buffer-truename))
+
+
+(use-package ispell
+  :defer t
+
+  :custom
+  (ispell-program-name "hunspell")
+  (ispell-personal-dictionary "~/.emacs.d/ispell-personal-dictionary")
+  (ispell-silently-savep t)
+  (ispell-local-dictionary-alist
+   '(("en_US"
+      "[[:alpha:]]" "[^[:alpha:]]" "[']" nil
+      ("-d" "en_US") nil utf-8)))
+  (ispell-local-dictionary "en_US")
+
+  :config
+  ;; Hunspell cannot create the personal dictionary file if it does not exist.
+  (unless (file-exists-p ispell-personal-dictionary)
+    (make-empty-file ispell-personal-dictionary))
+  ;; Skip URLs in spell-checking (used by both ispell and flyspell).
+  (add-to-list 'ispell-skip-region-alist '("\\bhttps?://\\S-+")))
+
+
+(use-package flyspell
+  :defer t
+  :bind ("C-c s b" . flyspell-buffer)
+  :hook (text-mode . flyspell-mode)
+  :custom (flyspell-sort-corrections t))
+
+
+(use-package flyspell-correct
+  :ensure t
+  :after flyspell
+  :defer t
+  :bind (:map flyspell-mode-map
+              ("C-c s w" . flyspell-correct-wrapper)))
+
+
+(use-package flymake
+  :defer t
+  :hook (sh-mode . flymake-mode))
+
+
+(use-package whitespace
+  :defer t
+  :bind (("C-c w m" . whitespace-mode)
+         ("C-c w r" . whitespace-report)
+         ("C-c w c" . whitespace-cleanup))
+
+  :diminish (global-whitespace-mode
+             whitespace-mode
+             whitespace-newline-mode)
+
+  :hook ((conf-mode
+          json-mode
+          ssh-config-mode
+          yaml-mode
+          makefile-mode)
+         . whitespace-mode)
+
+  :custom
+  (whitespace-line-column 100)
+  (whitespace-style '(face trailing tabs)))
+
+
 ;; `C-x k' is `kill-buffer' by default.
 (bind-key "C-x k" #'kill-current-buffer)
 ;; `C-z' is `suspend-frame' by default, but I don't use it and might
@@ -2666,3 +2587,4 @@ If no symbol at point, quit the *Help* window if visible."
 
 
 (report-time-since-load)
+

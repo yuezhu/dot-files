@@ -1,4 +1,4 @@
-;;; early-init.el --- ... -*- lexical-binding: t -*-
+;;; early-init.el --- ... -*- lexical-binding: t; coding: utf-8-emacs -*-
 
 ;; Disable native compilation entirely
 (setq native-comp-speed -1
