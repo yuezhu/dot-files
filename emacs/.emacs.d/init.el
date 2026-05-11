@@ -2006,17 +2006,20 @@ no region is activated, this will operate on the entire buffer."
        (add-hook 'after-save-hook #'check-parens nil t)))
 
   :preface
-  (defun describe-symbol-or-quit-help ()
+  (defun describe-symbol-at-point-dwim ()
     "Describe the symbol at point.
-If no symbol at point, quit the *Help* window if visible."
+If there is no symbol at point, or the *Help* window already shows help
+for that same symbol, quit the *Help* window."
     (interactive)
-    (if-let ((sym (symbol-at-point)))
-        (describe-symbol sym)
-      (when-let ((win (get-buffer-window "*Help*")))
-        (quit-window nil win))))
+    (let* ((sym (symbol-at-point))
+           (win (get-buffer-window "*Help*"))
+           (shown (and win (nth 1 (buffer-local-value 'help-xref-stack-item
+                                                      (window-buffer win))))))
+      (cond ((and sym (not (eq sym shown))) (describe-symbol sym))
+            (win (quit-window nil win)))))
 
   :bind (:map emacs-lisp-mode-map
-              ("C-q" . describe-symbol-or-quit-help))
+              ("C-q" . describe-symbol-at-point-dwim))
 
   :custom
   (emacs-lisp-docstring-fill-column fill-column))
