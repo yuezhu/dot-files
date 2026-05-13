@@ -102,7 +102,7 @@ MAX-HEIGHT-FRACTION is the maximum height as a fraction of the frame height
 
 ;; Some packages are built into Emacs, but I want to use ELPA versions.
 (defconst package-must-use-elpa-packages
-  '(modus-themes org)
+  '(modus-themes org eglot)
   "A list of packages that must use ELPA versions.")
 
 (advice-add 'package-installed-p :around
@@ -1878,6 +1878,7 @@ This only affects the current markdown buffer, and does not add the
 
 
 (use-package eglot
+  :ensure t
   :defer t
   :custom
   (eglot-autoshutdown t)
@@ -1891,7 +1892,13 @@ This only affects the current markdown buffer, and does not add the
   ;;    :documentOnTypeFormattingProvider
   ;;    :documentLinkProvider))
 
-  ;; :config
+  :config
+  ;; Prefer pyright for Python when installed; Eglot uses the first matching
+  ;; entry in `eglot-server-programs', overriding the default that would
+  ;; otherwise prompt to pick among several Python language servers.
+  (when (executable-find "pyright-langserver")
+    (add-to-list 'eglot-server-programs
+                 '((python-mode python-ts-mode) . ("pyright-langserver" "--stdio"))))
   ;; (add-to-list 'eglot-stay-out-of 'flymake)
   )
 
