@@ -143,32 +143,67 @@ Only treat them as installed if present in `package-alist'."
   :ensure t
   :defer t)
 
-(use-package async
-  :ensure t
-  :commands (async-start))
+(defvar package-upgrade-all-async--versions-before nil
+  "Pre-upgrade snapshot of installed (NAME . VERSION-LIST) pairs.
+Set when the async upgrade is launched, diffed against a fresh
+on-disk scan when the subprocess finishes.")
+
+(defun package-upgrade-all-async--versions ()
+  "Return an alist of installed (NAME . VERSION-LIST) by reading on-disk descriptors."
+  ;; `package-load-all-descriptors' walks `package-user-dir' and updates
+  ;; `package-alist' (the in-memory registry of installed packages). We
+  ;; only want a one-off snapshot, so we shadow `package-alist' with a
+  ;; `let' binding: the global `package-alist' is `defvar'd (dynamic
+  ;; binding), which means `setq' deep inside `package-load-descriptor'
+  ;; targets our local binding instead of mutating the parent's global
+  ;; state. The original value is restored when the `let' unwinds.
+  (let ((package-alist nil))
+    (package-load-all-descriptors)
+    (mapcar (lambda (entry)
+              (cons (car entry) (package-desc-version (cadr entry))))
+            package-alist)))
+
+(defun package-upgrade-all-async--finish (buf status)
+  "Echo the upgraded package list with a restart reminder.
+Triggered as a buffer-local `compilation-finish-functions' entry
+on the `*package-upgrade*' buffer."
+  (when (and (buffer-live-p buf)
+             (string-match "finished" status))
+    ;; The subprocess rewrote files under `package-user-dir'. Compare the
+    ;; pre-launch snapshot against a fresh on-disk scan; any package whose
+    ;; version changed was upgraded. No buffer-text parsing involved.
+    (let* ((before package-upgrade-all-async--versions-before)
+           (after (package-upgrade-all-async--versions))
+           (upgraded (delq nil
+                           (mapcar (lambda (entry)
+                                     (let ((old (alist-get (car entry) before)))
+                                       (when (and old (not (equal (cdr entry) old)))
+                                         (car entry))))
+                                   after))))
+      (when upgraded
+        (message "Upgraded: %s. Restart Emacs to load new versions."
+                 (mapconcat #'symbol-name upgraded ", "))))))
 
 (defun package-upgrade-all-async ()
-  "Upgrade all packages asynchronously without blocking Emacs."
+  "Upgrade all packages in a compilation buffer.
+When the subprocess finishes, the upgraded package list and a
+restart reminder are echoed to *Messages*."
   (interactive)
-  (message "Upgrading packages in background...")
-  (let ((archives package-archives))
-    (async-start
-     `(lambda ()
-        (require 'package)
-        (setq package-archives ',archives)
-        (package-initialize)
-        (package-refresh-contents)
-        (let ((upgradeable (package--upgradeable-packages)))
-          (package-upgrade-all nil)
-          upgradeable))
-     ;; On subprocess error, async re-signals it in the process sentinel
-     ;; rather than calling this callback, so errors surface as
-     ;; "error in process sentinel: ..." in the *Messages* buffer.
-     (lambda (upgraded)
-       (if upgraded
-           (message "Upgraded: %s — restart Emacs to load new versions"
-                    (mapconcat #'symbol-name upgraded ", "))
-         (message "No packages to upgrade"))))))
+  (setq package-upgrade-all-async--versions-before
+        (package-upgrade-all-async--versions))
+  (let* ((emacs (expand-file-name invocation-name invocation-directory))
+         (archives (prin1-to-string package-archives))
+         (form (format "(progn
+  (require 'package)
+  (setq package-archives '%s)
+  (package-initialize)
+  (package-upgrade-all nil))" archives))
+         (cmd (format "%s --batch --eval %s"
+                      (shell-quote-argument emacs)
+                      (shell-quote-argument form))))
+    (with-current-buffer (compilation-start cmd nil (lambda (_) "*package-upgrade*"))
+      (add-hook 'compilation-finish-functions
+                #'package-upgrade-all-async--finish nil t))))
 
 
 ;; (use-package emacs ...) is a common idiom for configuring built-in
@@ -383,7 +418,7 @@ Only treat them as installed if present in `package-alist'."
   :config
   (add-to-list 'display-buffer-alist
                '("\\`\\*Calendar\\*\\'"
-                 (display-buffer-at-bottom)
+                 (display-buffer-reuse-window display-buffer-at-bottom)
                  (inhibit-same-window . t))))
 
 
@@ -1014,7 +1049,7 @@ this is effective with some expand functions, eg.,
   :config
   (add-to-list 'display-buffer-alist
                '("\\`\\*rg\\*\\'"
-                 (display-buffer-at-bottom)
+                 (display-buffer-reuse-window display-buffer-at-bottom)
                  (inhibit-same-window . t)
                  (window-height . 0.5))))
 
@@ -1104,7 +1139,7 @@ this is effective with some expand functions, eg.,
   :config
   (add-to-list 'display-buffer-alist
                '("\\`magit:"
-                 (display-buffer-at-bottom)
+                 (display-buffer-reuse-window display-buffer-at-bottom)
                  (inhibit-same-window . t)
                  (window-height . 0.5)))
   (add-to-list 'display-buffer-alist
@@ -1132,18 +1167,28 @@ this is effective with some expand functions, eg.,
 (use-package compile
   :defer t
   :preface
+  (defconst compile-buffer-name-regexp "\\*\\(compilation\\|package-upgrade\\).*\\*"
+    "Regexp matching buffer names treated as compilation buffers
+for display and auto-bury behavior.")
+
+  (defconst compile-auto-bury-delay-seconds 3
+    "Seconds to wait before auto-burying a successful compilation buffer.")
+
   (defun delete-compile-windows-if-success (buffer string)
-    "Delete compilation windows if succeeded without warnings."
+    "Delete compilation windows if succeeded without warnings.
+Skip if the buffer is currently selected so we don't yank it out
+from under the user."
     (when (and (buffer-live-p buffer)
-               (string-match "compilation" (buffer-name buffer))
+               (string-match compile-buffer-name-regexp (buffer-name buffer))
                (string-match "finished" string)
                (not (with-current-buffer buffer
                       (goto-char (point-min))
                       (search-forward "warning" nil t))))
-      (run-with-timer 1 nil
+      (run-with-timer compile-auto-bury-delay-seconds nil
                       (lambda (buf)
-                        (bury-buffer buf)
-                        (delete-windows-on buf))
+                        (unless (eq buf (window-buffer (selected-window)))
+                          (bury-buffer buf)
+                          (delete-windows-on buf)))
                       buffer)))
 
   :hook
@@ -1152,6 +1197,13 @@ this is effective with some expand functions, eg.,
   :init
   (add-hook 'compilation-finish-functions
             #'delete-compile-windows-if-success)
+
+  :config
+  (add-to-list 'display-buffer-alist
+               `(,compile-buffer-name-regexp
+                 (display-buffer-reuse-window display-buffer-at-bottom)
+                 (inhibit-same-window . t)
+                 (window-height . 0.5)))
 
   :custom
   (compilation-always-kill t)
@@ -1378,7 +1430,7 @@ If no ID exists, this does nothing."
   ;; the frame, and prevent them from taking over the current window.
   (add-to-list 'display-buffer-alist
                '("\\`\\*Org Select\\*\\|\\*Agenda Commands\\*\\'"
-                 (display-buffer-at-bottom)
+                 (display-buffer-reuse-window display-buffer-at-bottom)
                  (inhibit-same-window . t)))
 
   ;; Set the path to the PlantUML JAR file for org-babel. This allows
@@ -1809,7 +1861,7 @@ This only affects the current markdown buffer, and does not add the
   :config
   (add-to-list 'display-buffer-alist
                `("\\`\\*.*-format errors\\*\\'"
-                 (display-buffer-at-bottom)
+                 (display-buffer-reuse-window display-buffer-at-bottom)
                  (inhibit-same-window . t)
                  (window-height . ,(apply-partially
                                     #'fit-window-to-frame-fraction 10 0.5)))))
@@ -2131,7 +2183,7 @@ for that same symbol, quit the *Help* window."
   :config
   (add-to-list 'display-buffer-alist
                `("\\`\\*\\(Gofmt Errors\\|go-rename\\)\\*\\'"
-                 (display-buffer-at-bottom)
+                 (display-buffer-reuse-window display-buffer-at-bottom)
                  (inhibit-same-window . t)
                  (window-height . ,(apply-partially
                                     #'fit-window-to-frame-fraction 10 0.5)))))
