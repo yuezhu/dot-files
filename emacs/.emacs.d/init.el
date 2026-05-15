@@ -926,7 +926,8 @@ restart reminder are echoed to *Messages*."
   :ensure t
   :demand t
   :custom
-  (corfu-auto nil)
+  (corfu-auto t)
+  (corfu-auto-delay 0.5)
   (corfu-min-width 80)
   (corfu-max-width corfu-min-width)     ; Always have the same width
   (corfu-count 14)
@@ -1883,24 +1884,32 @@ This only affects the current markdown buffer, and does not add the
   :custom
   (eglot-autoshutdown t)
   (eglot-events-buffer-size 0)
-  ;; (eglot-ignored-server-capabilites
-  ;;  '(:documentHighlightProvider
-  ;;    :codeActionProvider
-  ;;    :codeLensProvider
-  ;;    :documentFormattingProvider
-  ;;    :documentRangeFormattingProvider
-  ;;    :documentOnTypeFormattingProvider
-  ;;    :documentLinkProvider))
-
+  ;; Keep only inlay hints + jump (def/type/impl/decl) + references + completion.
+  ;; Ignore everything else, especially :semanticTokensProvider which recolors
+  ;; identifiers/keywords on top of the configured theme.
+  (eglot-ignored-server-capabilities
+   '(:semanticTokensProvider
+     :hoverProvider
+     :signatureHelpProvider
+     :colorProvider
+     :documentHighlightProvider
+     :codeActionProvider
+     :codeLensProvider
+     :documentFormattingProvider
+     :documentRangeFormattingProvider
+     :documentOnTypeFormattingProvider
+     :documentLinkProvider))
   :config
+  ;; Don't let eglot drive flymake or eldoc -- disables LSP-pushed diagnostic
+  ;; squiggles and any eldoc/echo-area hover docs.
+  (add-to-list 'eglot-stay-out-of 'flymake)
+  (add-to-list 'eglot-stay-out-of 'eldoc)
   ;; Prefer pyright for Python when installed; Eglot uses the first matching
   ;; entry in `eglot-server-programs', overriding the default that would
   ;; otherwise prompt to pick among several Python language servers.
   (when (executable-find "pyright-langserver")
     (add-to-list 'eglot-server-programs
-                 '((python-mode python-ts-mode) . ("pyright-langserver" "--stdio"))))
-  ;; (add-to-list 'eglot-stay-out-of 'flymake)
-  )
+                 '((python-mode python-ts-mode) . ("pyright-langserver" "--stdio")))))
 
 
 (use-package treesit
