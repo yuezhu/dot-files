@@ -1,28 +1,23 @@
 #!/bin/sh
-# tmux copy-pipe helper: copies selection to both the local system clipboard
-# and the SSH client's clipboard (via OSC 52 escape sequence).
+# tmux copy helper: push the selection to the clipboard by two independent
+# paths — the local system clipboard (xsel/pbcopy), and the outer terminal's
+# clipboard via OSC 52 (which also works across SSH).
 #
-# Called by tmux copy-pipe, which pipes the selected text to stdin. The pane's
-# TTY path is passed as $1 (via #{pane_tty} in .tmux.conf) so we can write
-# the OSC 52 sequence back to the terminal.
-#
-# Flow:
-#   1. Read selected text from stdin (provided by tmux copy-pipe)
-#   2. Copy to local clipboard (xsel on Linux, pbcopy on macOS) when available
-#   3. Base64-encode the text and emit an OSC 52 escape sequence to the pane TTY
-#      - tmux sees the OSC 52 on the pane and (with set-clipboard on)
-#        forwards it to the outer terminal AND sets the tmux paste buffer
-#      - This uses tmux's built-in OSC 52 handling (set-clipboard), NOT
-#        allow-passthrough - passthrough is for other escape sequences
-#      - The outer terminal decodes the base64 and sets its own clipboard
-#   4. If the base64 payload exceeds TMUX_OSC52_LIMIT, truncate and warn
-#
-# Requires:
-#   - base64          (encode selection for OSC 52)
-#   - tmux            (display-message for truncation warning)
-#   - xsel OR pbcopy  (optional; local system clipboard)
-#   - `set-clipboard on` or `external` in .tmux.conf (so tmux forwards
-#     OSC 52 written to the pane TTY through to the outer terminal)
+# - Run by the copy bindings' copy-pipe in .tmux.conf, which feeds the
+#   selected text to this script's stdin. The pane's TTY path is passed as $1
+#   (#{pane_tty}) so the script can write the OSC 52 sequence back to it.
+# - Local system clipboard: the text is piped to xsel (Linux, when $DISPLAY is
+#   set) or pbcopy (macOS) when available. Covers terminals without OSC 52.
+# - OSC 52: the text is base64-encoded and written to the pane TTY as the
+#   sequence ESC ] 52 ; c ; <base64> BEL. With `set-clipboard on`, tmux
+#   intercepts it, sets its own paste buffer, and forwards it to the outer
+#   terminal, which decodes the base64 and sets its clipboard. This rides
+#   tmux's built-in OSC 52 handling, NOT allow-passthrough (passthrough is
+#   for sequences tmux has no handler for).
+# - Oversized payloads are truncated to TMUX_OSC52_LIMIT before encoding
+#   (some terminals silently drop sequences past their limit) and a warning
+#   is shown.
+# - Requires base64; xsel or pbcopy are optional (local clipboard only).
 #
 # Usage (in .tmux.conf):
 #   send-keys -FX copy-pipe "~/dot-files/tmux/tmux-copy.sh #{pane_tty}"
