@@ -500,22 +500,25 @@ restart reminder are echoed to *Messages*."
 
 
 ;; Terminal Emacs: set interprogram-paste-function so C-y can paste
-;; text copied outside Emacs.  Returns nil when unavailable, which
-;; makes Emacs fall back to the kill ring.
+;; text copied outside Emacs.  The cond is evaluated on every call so
+;; it tracks env changes (e.g. starting tmux after Emacs launched).
+;; Returns nil when no source is available, which makes Emacs fall
+;; back to the kill ring.
 (unless (display-graphic-p)
   (setq interprogram-paste-function
-        (cond
-         ;; Inside tmux: read from the tmux paste buffer.
-         ((getenv "TMUX")
-          (lambda ()
+        (lambda ()
+          (cond
+           ;; Inside tmux: read from the tmux paste buffer.
+           ((getenv "TMUX")
             (let ((text (with-output-to-string
                           (with-current-buffer standard-output
                             (call-process "tmux" nil t nil "save-buffer" "-")))))
-              (unless (string-empty-p text) text))))
-         ;; Outside tmux: read from X11 clipboard via xsel.
-         ;; Over SSH without X forwarding, xsel fails and returns "".
-         ((executable-find "xsel")
-          (lambda ()
+              (unless (string-empty-p text) text)))
+           ;; With an X display: read from the X11 clipboard via xsel.
+           ;; Over SSH without X forwarding $DISPLAY is unset; calling
+           ;; xsel anyway floods the paste with "Can't open display"
+           ;; (stderr from call-process DESTINATION=t mixes into stdout).
+           ((and (getenv "DISPLAY") (executable-find "xsel"))
             (let ((text (with-output-to-string
                           (with-current-buffer standard-output
                             (call-process "xsel" nil t nil "-ob")))))
