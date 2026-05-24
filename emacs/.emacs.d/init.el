@@ -677,7 +677,7 @@ restart reminder are echoed to *Messages*."
                  ((eq system-type 'darwin)
                   (set-face-attribute
                    'default nil :font
-                   (font-spec :family "JetBrains Mono" :size 14))))
+                   (font-spec :family "Menlo" :size 15))))
                 (set-frame-parameter nil 'fullscreen 'maximized))))
 
 
