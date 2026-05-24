@@ -1,43 +1,41 @@
 ## Appearance
-# Color theme
+# Dark color theme
 theme = Modus Vivendi
-# Use Display P3 color space for more vivid colors
+# Wide-gamut Display P3 color space for more vivid colors
 window-colorspace = display-p3
 
 ## Font
-# Make text appear bolder
 font-thicken = true
-# How much bolder the text appears (0–255, higher = thicker)
+# Stroke thickness (0–255)
 font-thicken-strength = 31
-# Disable ligatures (e.g. -> rendered as a single arrow glyph)
+# Disable calt (contextual alternates), e.g. -> rendered as a single arrow glyph
 font-feature = -calt
+# Apple's bundled monospace font
+font-family = Menlo
 # Text size in points
 font-size = 15
 
 ## Cursor
 # Cursor shape: block, bar, or underline
 cursor-style = block
-# Keep the cursor steady instead of blinking
 cursor-style-blink = false
-# Disable "shell integration" cursor changes so cursor stays as set above
+# Disable shell integration cursor overrides to keep the style above
 shell-integration-features = no-cursor
 
 ## Clipboard
 # Ask for confirmation before pasting potentially harmful text
 clipboard-paste-protection = true
-# Only allow pasting when the program supports "bracketed paste"
-# (a protocol that prevents pasted text from being run as commands)
+# Only paste when the program supports bracketed paste
+# (a protocol that wraps pasted text to prevent it being run as commands)
 clipboard-paste-bracketed-safe = true
 
 ## Mouse
-# Multiplier applied to wheel deltas before forwarding to TUI apps (SGR mouse
-# mode) and before scrolling Ghostty's own scrollback. Default is 3.0, which
-# causes one physical wheel click to arrive as ~3 wheel events — this
-# compounds with per-event scroll amounts in tmux copy-mode and similar apps.
-# 1.0 forwards wheel events 1:1 with the OS delta (≈3 events per wheel click
-# on macOS), so per-event multipliers in TUI apps remain in control.
+# Wheel event multiplier applied before forwarding to TUI apps (SGR mouse
+# mode) and Ghostty's own scrollback. At the default of 3.0, one wheel click
+# arrives as ~3 events, compounding with per-event amounts in apps like tmux
+# copy-mode. 1.0 passes events 1:1, keeping per-app multipliers in control.
 mouse-scroll-multiplier = 1
 
 ## Scrollback
-# How many bytes of terminal output to keep for scrolling back (≈25 MB)
+# Scrollback buffer size in bytes (≈25 MB)
 scrollback-limit = 25000000
