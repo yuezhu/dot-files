@@ -1107,6 +1107,7 @@ this is effective with some expand functions, eg.,
 (use-package project
   :defer t
   :custom
+  (project-mode-line t)
   (project-switch-commands 'project-dired))
 
 
