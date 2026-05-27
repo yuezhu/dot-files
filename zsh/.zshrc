@@ -444,6 +444,62 @@ alias cp='cp -i'
 alias mv='mv -i'
 alias history='history -i 0'
 
+# Convert an epoch value to a local-time ISO-8601 date string.
+# Usage: epoch2date <value> [s|ms|us|ns]
+# When unit is omitted, infer from digit count (<=12/15/18/else -> s/ms/us/ns).
+function epoch2date {
+    local value="$1" unit="$2" prec padded sec frac
+    local usage="usage: epoch2date <value> [s|ms|us|ns]"
+    if [[ -z "$value" || ! "$value" =~ '^[0-9]+$' ]]; then
+        print -r -- "$usage" >&2
+        return 1
+    fi
+    if [[ -z "$unit" ]]; then
+        local n=${#value}
+        if   (( n <= 12 )); then unit=s
+        elif (( n <= 15 )); then unit=ms
+        elif (( n <= 18 )); then unit=us
+        else                     unit=ns
+        fi
+    fi
+    case "$unit" in
+        s)  prec=0 ;;
+        ms) prec=3 ;;
+        us) prec=6 ;;
+        ns) prec=9 ;;
+        *)  print -r -- "$usage" >&2; return 1 ;;
+    esac
+    # Left-pad so we can slice off `prec` fractional digits.
+    padded="$value"
+    while (( ${#padded} <= prec )); do padded="0$padded"; done
+    if (( prec > 0 )); then
+        sec="${padded[1,-$((prec+1))]}"
+        frac="${padded[-prec,-1]}"
+    else
+        sec="$padded"
+    fi
+    # Pick GNU date if available: `gdate` on macOS-with-coreutils, plain `date` on Linux.
+    local gnu_date=
+    if (( $+commands[gdate] )); then
+        gnu_date=gdate
+    elif date -d @0 +%s &>/dev/null; then
+        gnu_date=date
+    fi
+    if [[ -n $gnu_date ]]; then
+        # GNU date: %N = nanoseconds, %${prec}N truncates to that width; %:z = ±HH:MM.
+        if (( prec > 0 )); then
+            $gnu_date -d "@${sec}.${frac}" "+%Y-%m-%dT%H:%M:%S.%${prec}N%:z"
+        else
+            $gnu_date -d "@${sec}" "+%Y-%m-%dT%H:%M:%S%:z"
+        fi
+    else
+        # BSD date: -r takes epoch seconds, %:z is unsupported, so emit %z (±HHMM)
+        # and insert the colon via sed.
+        date -r "$sec" "+%Y-%m-%dT%H:%M:%S${frac:+.$frac}%z" \
+            | sed -E 's/([-+][0-9]{2})([0-9]{2})$/\1:\2/'
+    fi
+}
+
 ## Custom
 
 if [[ -f ~/.zsh_custom ]]; then
