@@ -1179,16 +1179,18 @@ for display and auto-bury behavior.")
   (defconst compile-auto-bury-delay-seconds 3
     "Seconds to wait before auto-burying a successful compilation buffer.")
 
-  (defun delete-compile-windows-if-success (buffer string)
-    "Delete compilation windows if succeeded without warnings.
+  (defun bury-compile-window-if-clean (buffer string)
+    "Bury BUFFER's window if it finished with no errors or warnings.
+Uses the buffer-local counters `compilation-num-errors-found' and
+`compilation-num-warnings-found' populated by `compilation-mode'.
 Skip if the buffer is currently selected so we don't yank it out
 from under the user."
     (when (and (buffer-live-p buffer)
                (string-match compile-buffer-name-regexp (buffer-name buffer))
-               (string-match "finished" string)
-               (not (with-current-buffer buffer
-                      (goto-char (point-min))
-                      (search-forward "warning" nil t))))
+               (string-prefix-p "finished" string)
+               (with-current-buffer buffer
+                 (and (zerop compilation-num-errors-found)
+                      (zerop compilation-num-warnings-found))))
       (run-with-timer compile-auto-bury-delay-seconds nil
                       (lambda (buf)
                         (unless (eq buf (window-buffer (selected-window)))
@@ -1201,7 +1203,7 @@ from under the user."
 
   :init
   (add-hook 'compilation-finish-functions
-            #'delete-compile-windows-if-success)
+            #'bury-compile-window-if-clean)
 
   :config
   (add-to-list 'display-buffer-alist
