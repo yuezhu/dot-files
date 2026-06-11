@@ -8,8 +8,8 @@
 # The script tries two methods to discover the correct tty:
 #
 #   1. Ask tmux directly (requires being inside a tmux session).
-#   2. Resolve the parent process's stderr fd via /proc (works outside
-#      tmux on Linux).
+#   2. Fall back to /dev/tty, the process's controlling terminal
+#      (works outside tmux on both Linux and macOS).
 #
 # Both methods fail gracefully — errors are suppressed and the script
 # always exits 0 so it never blocks Claude Code.
@@ -20,10 +20,13 @@
 # tmux session.
 [ -n "$TMUX" ] && TTY=$(tmux display-message -t "$TMUX_PANE" -p '#{pane_tty}' 2>/dev/null)
 
-# Method 2: Fall back to reading the parent process's stderr fd from
-# procfs. This works on Linux even outside tmux, as long as stderr
-# points to a real terminal device (e.g. /dev/pts/N).
-[ -z "$TTY" ] && TTY=$(readlink "/proc/$PPID/fd/2" 2>/dev/null)
+# Method 2: Fall back to /dev/tty, which always refers to the process's
+# controlling terminal regardless of how stdin/stdout/stderr were
+# redirected (Claude Code pipes JSON over stdin). A child of Claude Code
+# inherits its controlling terminal, so this works outside tmux on both
+# Linux and macOS. If the hook has no controlling terminal, the device
+# check below fails and the bell is silently skipped.
+[ -z "$TTY" ] && [ -c /dev/tty ] && TTY=/dev/tty
 
 # Write the bell only if we resolved a valid character device, to
 # avoid writing to pipes, regular files, or nonexistent paths.

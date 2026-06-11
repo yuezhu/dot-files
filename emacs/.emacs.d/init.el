@@ -1741,10 +1741,30 @@ RESULT is the return value of `org-tempo-complete-tag' (t on success, nil on fai
   :mode (("\\.md\\'"       . gfm-mode)
          ("\\.markdown\\'" . markdown-mode))
   :hook (markdown-mode . markdown-toc-mode)
+  ;; `.md' opens in `gfm-mode', whose `gfm-mode-map' rebinds ` directly
+  ;; (shadowing the inherited `markdown-mode-map'), so bind both maps.
+  :bind (:map markdown-mode-map
+              ("`" . markdown-backquote-dwim)
+              :map gfm-mode-map
+              ("`" . markdown-backquote-dwim))
   :custom
   (markdown-command "multimarkdown")
   (markdown-nested-imenu-heading-index nil)
-  (markdown-toc-header-toc-title "# Table of Contents"))
+  (markdown-toc-header-toc-title "# Table of Contents")
+  :config
+  (defun markdown-backquote-dwim (arg)
+    "Surround the active region with inline-code backticks.
+With no active region, defer to `markdown-electric-backquote', which
+self-inserts a backquote and expands a leading ``` into a fenced code
+block (GFM electric backquote).
+
+`electric-pair-mode' cannot do this region wrapping in markdown because
+this mode rebinds ` away from `self-insert-command' (the keystroke
+`electric-pair-mode' hooks)."
+    (interactive "*P")
+    (if (use-region-p)
+        (markdown-insert-code)
+      (markdown-electric-backquote arg))))
 
 
 (use-package markdown-toc
