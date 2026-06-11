@@ -68,12 +68,13 @@ _prepend_path \
   "${HOMEBREW_PREFIX}/opt/findutils/libexec/gnubin" \
   "${HOMEBREW_PREFIX}/opt/curl/bin"
 
-# Personal binaries
+# Per-user binaries
 _prepend_path \
+  "${HOME}/.local/bin" \
   "${HOME}/bin" \
   "${HOME}/Library/Mobile Documents/com~apple~CloudDocs/bin"
 
-# User-level Node modules
+# Per-user node modules
 _prepend_node_path \
   "${HOME}/.local/node_modules"
 
