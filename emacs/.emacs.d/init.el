@@ -2617,6 +2617,9 @@ for that same symbol, quit the *Help* window."
   :defer t
 
   :custom
+  ;; Don't add `ispell-completion-at-point' to text modes; it errors under
+  ;; corfu-auto without a plain word-list (`ispell-alternate-dictionary').
+  (text-mode-ispell-word-completion nil)
   (ispell-program-name "hunspell")
   (ispell-personal-dictionary "~/.emacs.d/ispell-personal-dictionary")
   (ispell-silently-savep t)
