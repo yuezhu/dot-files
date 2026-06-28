@@ -53,7 +53,7 @@ typeset -U path
 typeset -U fpath
 
 # Homebrew
-if brew=$(_first_exec /usr/local/bin/brew /opt/homebrew/bin/brew); then
+if brew=$(_first_exec /opt/homebrew/bin/brew /usr/local/bin/brew); then
   eval "$($brew shellenv)"
 fi
 
