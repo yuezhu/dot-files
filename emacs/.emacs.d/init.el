@@ -937,9 +937,8 @@ restart reminder are echoed to *Messages*."
   (corfu-scroll-margin 4)
   (corfu-cycle nil)                ;; Enable cycling for `corfu-next/previous'
 
-  :bind
-  ;; Configure SPC for separator insertion
-  (:map corfu-map ("SPC" . corfu-insert-separator))
+  ;; SPC inserts a literal space (and dismisses the popup). Use the built-in
+  ;; M-SPC (`corfu-insert-separator') for orderless-style multi-term filtering.
 
   :config
   (global-corfu-mode))
