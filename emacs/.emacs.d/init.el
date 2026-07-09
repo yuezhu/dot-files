@@ -1281,7 +1281,7 @@ from under the user."
   :defer t
 
   :bind (("C-c a" . org-agenda)
-         ("C-c c" . org-capture)
+         ;; ("C-c c" . org-capture)
          ("C-c l" . org-store-link))
 
   :preface
@@ -1298,23 +1298,25 @@ Duplicates are skipped based on the language name (car)."
     (org-babel-do-load-languages 'org-babel-load-languages
                                  org-babel-load-languages))
 
-  (defun org-copy-current-topmost-heading-id ()
-    "Copy the org ID of the current topmost heading to the kill ring.
-If no ID exists, this does nothing."
+  (defun org-id-copy-inherited ()
+    "Copy the ID of the entry at point to the kill ring.
+Uses `org-id-get' with inheritance (its INHERIT argument): from a
+subheading it returns the nearest ancestor heading's ID, falling back to
+the file-level or global ID if no heading has one.  Read-only -- unlike
+`org-id-copy' it never creates an ID.  Does nothing if none is found.
+
+Runs on `org-capture-prepare-finalize', where point sits in the
+just-captured entry, so this copies that entry's ID for pasting as an
+`id:' link."
     (interactive)
-    (save-excursion
-      (unless (org-before-first-heading-p)
-        (org-back-to-heading t)
-        (while (org-up-heading-safe))
-        (let* ((heading (org-get-heading t t t t))
-               (id (org-id-get)))
-          (if (not id)
-              (message "No org ID found for heading '%s'" heading)
-            (kill-new id)
-            (message "Copied ID for heading '%s': %s" heading id))))))
+    (let ((id (org-id-get nil nil nil t)))
+      (if (not id)
+          (message "No org ID found at or above point")
+        (kill-new id)
+        (message "Copied ID: %s" id))))
 
   :hook
-  (org-capture-prepare-finalize . org-copy-current-topmost-heading-id)
+  (org-capture-prepare-finalize . org-id-copy-inherited)
 
   :init
   (defconst org-home-directory (or (getenv "EMACS_ORG_HOME")
@@ -1330,10 +1332,6 @@ If no ID exists, this does nothing."
   (org-directory org-base-directory)
 
   (org-agenda-files `(,(file-name-as-directory org-base-directory)))
-
-  ;; (org-default-notes-file (concat
-  ;;                          (file-name-as-directory org-directory)
-  ;;                          "notes.org"))
 
   ;; Enable the `org-tempo' module to use easy templates
   (org-modules '(org-tempo))
@@ -1360,8 +1358,12 @@ If no ID exists, this does nothing."
   (org-log-done 'time)
   (org-log-reschedule 'time)
 
-  ;; Do no timestamp checking and always publish all files
-  (org-publish-use-timestamps-flag nil)
+  ;; Skip republishing a file when its source is unchanged since the last
+  ;; publish. Org records per-file timestamps in `org-publish-timestamp-directory'
+  ;; (~/.org-timestamps/) and compares the source's mtime against them. Force a
+  ;; full rebuild with a prefix arg (C-u M-x org-publish). Note: the check only
+  ;; looks at the source .org file, not whether the output HTML still exists.
+  (org-publish-use-timestamps-flag t)
 
   ;; When editing source code blocks, use the current window
   (org-src-window-setup 'current-window)
@@ -1392,39 +1394,41 @@ If no ID exists, this does nothing."
 
   (org-yank-adjusted-subtrees t)
 
-  (org-capture-templates
-   '(("j" "Journal" entry
-      (file+olp+datetree "journal.org")
-      "* %?\n%i"
-      :jump-to-captured t)))
+  ;; (org-capture-templates
+  ;;  '(("j" "Journal" entry
+  ;;     (file+olp+datetree "journal.org")
+  ;;     "* %?\n%i"
+  ;;     :jump-to-captured t)))
 
   (org-publish-project-alist
-   `(("org-file"
-      :base-directory ,org-base-directory
-      :base-extension "org"
-      :publishing-function org-html-publish-to-html
-      :publishing-directory "~/.www/org"
-      :recursive t)
-     ("org-static"
-      :base-directory ,org-base-directory
-      :base-extension "png\\|jpg\\|jpeg\\|gif\\|svg\\|css\\|pdf"
-      :publishing-function org-publish-attachment
-      :publishing-directory "~/.www/org/"
-      :recursive t)
-     ("org" :components ("org-file" "org-static"))
+   `(
+     ;; ("org-file"
+     ;;  :base-directory ,org-base-directory
+     ;;  :base-extension "org"
+     ;;  :publishing-function org-html-publish-to-html
+     ;;  :publishing-directory "~/.www/org"
+     ;;  :recursive nil)
+     ;; ("org-asset"
+     ;;  :base-directory ,(file-name-concat org-base-directory "assets")
+     ;;  :base-extension "png\\|jpg\\|jpeg\\|gif\\|svg\\|css\\|pdf"
+     ;;  :publishing-function org-publish-attachment
+     ;;  :publishing-directory "~/.www/org/assets"
+     ;;  :recursive nil)
+     ;; ("org" :components ("org-file" "org-asset"))
+     ("org-roam" :components ("org-roam-file" "org-roam-asset"))
      ("org-roam-file"
       :base-directory ,org-roam-base-directory
       :base-extension "org"
       :publishing-function org-html-publish-to-html
       :publishing-directory "~/.www/org-roam"
-      :recursive t)
-     ("org-roam-static"
-      :base-directory ,org-roam-base-directory
+      :recursive nil)
+     ("org-roam-asset"
+      :base-directory ,(file-name-concat org-roam-base-directory "assets")
       :base-extension "png\\|jpg\\|jpeg\\|gif\\|svg\\|css\\|pdf"
       :publishing-function org-publish-attachment
-      :publishing-directory "~/.www/org-roam/"
-      :recursive t)
-     ("org-roam" :components ("org-file" "org-static"))))
+      :publishing-directory "~/.www/org-roam/assets"
+      :recursive nil)
+     ))
 
   (org-todo-keywords
    '((sequence "TODO(t)" "IN-PROGRESS(i)" "WAITING(w)" "|" "DONE(d)" "CANCELLED(c)")))
@@ -1550,7 +1554,7 @@ RESULT is the return value of `org-tempo-complete-tag' (t on success, nil on fai
   (org-roam-directory org-roam-base-directory)
 
   ;; Location of the SQLite database that indexes all nodes and links
-  (org-roam-db-location (file-name-concat user-emacs-directory "org-roam.db"))
+  (org-roam-db-location (file-name-concat org-roam-base-directory "org-roam.db"))
 
   ;; Automatically update the database whenever a roam file is saved.  This
   ;; keeps backlinks accurate in real time at a small cost to save speed.
@@ -1575,6 +1579,19 @@ RESULT is the return value of `org-tempo-complete-tag' (t on success, nil on fai
    '(
      ;; Default Notes
      ("d" "Default" plain
+      "%?"
+      ;; ${slug} is the URL-safe version of ${title}:
+      ;; spaces become hyphens, special characters are dropped.
+      ;; e.g. title "My Project Notes" → slug "my-project-notes"
+      :target (file+head
+               "%<%Y%m%d%H%M%S>-${slug}.org"
+               "#+title: ${title}
+#+created: %T
+")
+      :unnarrowed t)
+
+     ;; Private Notes
+     ("p" "Private" plain
       "%?"
       ;; ${slug} is the URL-safe version of ${title}:
       ;; spaces become hyphens, special characters are dropped.
@@ -1692,9 +1709,7 @@ RESULT is the return value of `org-tempo-complete-tag' (t on success, nil on fai
   :config
   ;; Ensure the meetings/ subdirectory exists. The Meeting Notes capture
   ;; template expects to find it.
-  (make-directory (concat (file-name-as-directory org-roam-directory)
-                          "meetings")
-                  t)
+  (make-directory (file-name-concat org-roam-directory "meetings") t)
 
   ;; Start the background process that keeps the database in sync with files on
   ;; disk
