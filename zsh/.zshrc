@@ -1,16 +1,19 @@
 ## Helpers
 
-# Print the first existing directory from the given candidates
-function _first_dir {
-  local d
-  for d in "$@"; do
-    [[ -d "$d" ]] && { print -r -- "$d"; return; }
+# Source the first readable file from the given candidates.
+# Returns 0 if one was sourced, 1 if none were readable.
+function _source_file {
+  local f
+  for f in "$@"; do
+    [[ -r "$f" ]] || continue
+    source "$f"
+    return 0
   done
   return 1
 }
 
 # Print the first executable file from the given candidates
-function _first_exec {
+function _find_exec {
   local f
   for f in "$@"; do
     [[ -x "$f" ]] && { print -r -- "$f"; return; }
@@ -53,13 +56,24 @@ typeset -U path
 typeset -U fpath
 
 # Homebrew
-if brew=$(_first_exec /opt/homebrew/bin/brew /usr/local/bin/brew); then
+if brew=$(_find_exec /opt/homebrew/bin/brew /usr/local/bin/brew); then
   eval "$($brew shellenv)"
 fi
 
 # Default to empty string so ${HOMEBREW_PREFIX}/... expansions are safe on
 # systems without homebrew (e.g. Linux), and set -u won't error on unbound variable
 : "${HOMEBREW_PREFIX:=}"
+
+# Package providers searched for zsh plugins, in precedence order
+# (nix-profile before Homebrew). Sites fan a relative path across these roots as
+# "${(@)^zsh_providers}/rel": ^ (rc-expansion) distributes the suffix across the
+# array, (@) keeps each root a separate word inside the quotes, and quoting
+# blocks word-splitting and filename-generation (globbing) of the paths.
+# $HOME is always set, so nix-profile is unconditional. Homebrew is added only
+# when its prefix is set (it is empty on systems without homebrew, e.g. Linux),
+# so an unset prefix doesn't build bogus root-anchored candidates like /bin/fzf.
+zsh_providers=("${HOME}/.nix-profile")
+[[ -n $HOMEBREW_PREFIX ]] && zsh_providers+=("${HOMEBREW_PREFIX}")
 
 # Homebrew binaries
 _prepend_path \
@@ -85,9 +99,7 @@ _prepend_fpath \
 
 ## fzf
 
-if exe=$(_first_exec \
-           "${HOME}/.nix-profile/bin/fzf" \
-           "${HOMEBREW_PREFIX}/bin/fzf"); then
+if exe=$(_find_exec "${(@)^zsh_providers}/bin/fzf"); then
 
   export FZF_DEFAULT_OPTS="--height 40% \
     --layout reverse \
@@ -125,7 +137,7 @@ fi
 ## Completion
 
 # Export LS_COLORS (used by completion list-colors below)
-if exe=$(_first_exec "${HOMEBREW_PREFIX}/bin/gdircolors" /usr/bin/dircolors); then
+if exe=$(_find_exec "${HOMEBREW_PREFIX}/bin/gdircolors" /usr/bin/dircolors); then
   eval "$($exe -b)"
 fi
 
@@ -180,18 +192,15 @@ setopt COMPLETE_IN_WORD
 # Do not require a leading '.' in a filename to be matched explicitly.
 setopt GLOB_DOTS
 
-if dir=$(_first_dir \
-           "${HOME}/.nix-profile/share/fzf-tab" \
-           "${HOMEBREW_PREFIX}/share/fzf-tab"); then
-
-  source "${dir}/fzf-tab.zsh"
+if _source_file "${(@)^zsh_providers}/share/fzf-tab/fzf-tab.zsh"; then
 
   # force zsh not to show completion menu, which allows fzf-tab to capture the unambiguous prefix
   zstyle ':completion:*' menu no
 
 else
-  # Native zsh completion UI — only needed when fzf-tab is absent.
-  # complist provides menuselect keymap and colored completion listings.
+  # Native zsh completion UI — only reached when fzf-tab is absent (e.g. a
+  # fresh box or minimal env before nix/brew provisioning).
+  # complist provides the menuselect keymap and colored completion listings.
   zmodload -i zsh/complist
 
   # When listing files that are possible completions, show the type of each file
@@ -386,23 +395,20 @@ export GPG_TTY=$TTY
 ## Plugins
 
 # zsh-autosuggestions
-if dir=$(_first_dir \
-           "${HOME}/.nix-profile/share/zsh-autosuggestions" \
-           "${HOMEBREW_PREFIX}/share/zsh-autosuggestions"); then
-  source "${dir}/zsh-autosuggestions.zsh"
-fi
+_source_file "${(@)^zsh_providers}/share/zsh-autosuggestions/zsh-autosuggestions.zsh"
 
-# zsh-fast-syntax-highlighting
-if dir=$(_first_dir \
-           "${HOME}/.nix-profile/share/zsh/plugins/fast-syntax-highlighting" \
-           "${HOMEBREW_PREFIX}/share/zsh-fast-syntax-highlighting"); then
-  source "${dir}/fast-syntax-highlighting.plugin.zsh"
-elif dir=$(_first_dir \
-             "${HOME}/.nix-profile/share/zsh-syntax-highlighting" \
-             "${HOMEBREW_PREFIX}/share/zsh-syntax-highlighting"); then
-  # Or try zsh-syntax-highlighting
-  export ZSH_HIGHLIGHT_HIGHLIGHTERS_DIR="${dir}/highlighters"
-  source "${dir}/zsh-syntax-highlighting.zsh"
+# zsh-fast-syntax-highlighting.
+# Paths diverge per provider (nix nests under share/zsh/plugins, Homebrew uses
+# a flat zsh-fast-syntax-highlighting dir), so candidates are listed in full
+# rather than fanned across ${^zsh_providers}.
+if _source_file \
+     "${HOME}/.nix-profile/share/zsh/plugins/fast-syntax-highlighting/fast-syntax-highlighting.plugin.zsh" \
+     "${HOMEBREW_PREFIX}/share/zsh-fast-syntax-highlighting/fast-syntax-highlighting.plugin.zsh"; then
+  : # loaded fast-syntax-highlighting
+elif _source_file "${(@)^zsh_providers}/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"; then
+  # Fall back to zsh-syntax-highlighting. It self-locates its highlighters dir
+  # from its own script path; set ZSH_HIGHLIGHT_HIGHLIGHTERS_DIR manually only
+  # if an install ever breaks that resolution.
   export ZSH_HIGHLIGHT_STYLES[comment]='fg=245'
 fi
 
@@ -449,56 +455,56 @@ alias history='history -i 0'
 # Usage: epoch2date <value> [s|ms|us|ns]
 # When unit is omitted, infer from digit count (<=12/15/18/else -> s/ms/us/ns).
 function epoch2date {
-    local value="$1" unit="$2" prec padded sec frac
-    local usage="usage: epoch2date <value> [s|ms|us|ns]"
-    if [[ -z "$value" || ! "$value" =~ '^[0-9]+$' ]]; then
-        print -r -- "$usage" >&2
-        return 1
+  local value="$1" unit="$2" prec padded sec frac
+  local usage="usage: epoch2date <value> [s|ms|us|ns]"
+  if [[ -z "$value" || ! "$value" =~ '^[0-9]+$' ]]; then
+    print -r -- "$usage" >&2
+    return 1
+  fi
+  if [[ -z "$unit" ]]; then
+    local n=${#value}
+    if   (( n <= 12 )); then unit=s
+    elif (( n <= 15 )); then unit=ms
+    elif (( n <= 18 )); then unit=us
+    else                     unit=ns
     fi
-    if [[ -z "$unit" ]]; then
-        local n=${#value}
-        if   (( n <= 12 )); then unit=s
-        elif (( n <= 15 )); then unit=ms
-        elif (( n <= 18 )); then unit=us
-        else                     unit=ns
-        fi
-    fi
-    case "$unit" in
-        s)  prec=0 ;;
-        ms) prec=3 ;;
-        us) prec=6 ;;
-        ns) prec=9 ;;
-        *)  print -r -- "$usage" >&2; return 1 ;;
-    esac
-    # Left-pad so we can slice off `prec` fractional digits.
-    padded="$value"
-    while (( ${#padded} <= prec )); do padded="0$padded"; done
+  fi
+  case "$unit" in
+    s)  prec=0 ;;
+    ms) prec=3 ;;
+    us) prec=6 ;;
+    ns) prec=9 ;;
+    *)  print -r -- "$usage" >&2; return 1 ;;
+  esac
+  # Left-pad so we can slice off `prec` fractional digits.
+  padded="$value"
+  while (( ${#padded} <= prec )); do padded="0$padded"; done
+  if (( prec > 0 )); then
+    sec="${padded[1,-$((prec+1))]}"
+    frac="${padded[-prec,-1]}"
+  else
+    sec="$padded"
+  fi
+  # Pick GNU date if available: `gdate` on macOS-with-coreutils, plain `date` on Linux.
+  local gnu_date=
+  if (( $+commands[gdate] )); then
+    gnu_date=gdate
+  elif date -d @0 +%s &>/dev/null; then
+    gnu_date=date
+  fi
+  if [[ -n $gnu_date ]]; then
+    # GNU date: %N = nanoseconds, %${prec}N truncates to that width; %:z = ±HH:MM.
     if (( prec > 0 )); then
-        sec="${padded[1,-$((prec+1))]}"
-        frac="${padded[-prec,-1]}"
+      $gnu_date -d "@${sec}.${frac}" "+%Y-%m-%dT%H:%M:%S.%${prec}N%:z"
     else
-        sec="$padded"
+      $gnu_date -d "@${sec}" "+%Y-%m-%dT%H:%M:%S%:z"
     fi
-    # Pick GNU date if available: `gdate` on macOS-with-coreutils, plain `date` on Linux.
-    local gnu_date=
-    if (( $+commands[gdate] )); then
-        gnu_date=gdate
-    elif date -d @0 +%s &>/dev/null; then
-        gnu_date=date
-    fi
-    if [[ -n $gnu_date ]]; then
-        # GNU date: %N = nanoseconds, %${prec}N truncates to that width; %:z = ±HH:MM.
-        if (( prec > 0 )); then
-            $gnu_date -d "@${sec}.${frac}" "+%Y-%m-%dT%H:%M:%S.%${prec}N%:z"
-        else
-            $gnu_date -d "@${sec}" "+%Y-%m-%dT%H:%M:%S%:z"
-        fi
-    else
-        # BSD date: -r takes epoch seconds, %:z is unsupported, so emit %z (±HHMM)
-        # and insert the colon via sed.
-        date -r "$sec" "+%Y-%m-%dT%H:%M:%S${frac:+.$frac}%z" \
-            | sed -E 's/([-+][0-9]{2})([0-9]{2})$/\1:\2/'
-    fi
+  else
+    # BSD date: -r takes epoch seconds, %:z is unsupported, so emit %z (±HHMM)
+    # and insert the colon via sed.
+    date -r "$sec" "+%Y-%m-%dT%H:%M:%S${frac:+.$frac}%z" \
+      | sed -E 's/([-+][0-9]{2})([0-9]{2})$/\1:\2/'
+  fi
 }
 
 ## Custom
