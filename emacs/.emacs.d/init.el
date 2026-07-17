@@ -1389,6 +1389,13 @@ just-captured entry, so this copies that entry's ID for pasting as an
   ;; When creating a link to a heading, automatically assign an org ID to
   ;; it. This enables precise heading-level links.
   ;; (org-id-link-to-org-use-id t)
+
+  ;; Maintain a global id -> file index (`org-id-locations') so that `id:'
+  ;; links resolve for both following and export across all files, not just
+  ;; those visited this session. Without this, exporting a note that links to
+  ;; an as-yet-unopened node aborts with "Unable to resolve link".
+  (org-id-track-globally t)
+
   ;; Remove ID property of clones of a subtree
   (org-clone-delete-id t)
 
@@ -1549,6 +1556,18 @@ RESULT is the return value of `org-tempo-complete-tag' (t on success, nil on fai
 (use-package org-roam
   :ensure t
   :defer t
+
+  :preface
+  (defun org-roam-refresh ()
+    "Re-index org-roam notes so externally added nodes/IDs resolve this session.
+Refreshes both stores: the org-roam database (backlinks, node completion) and
+the `org-id-locations' index (`id:' link following and export).  Use after a
+node file is created or edited outside this Emacs session."
+    (interactive)
+    (org-roam-db-sync)
+    (org-roam-update-org-id-locations)
+    (message "org-roam: DB + org-id-locations refreshed"))
+
   :custom
   ;; Base directory that `org-roam' files; all node files live here
   (org-roam-directory org-roam-base-directory)
