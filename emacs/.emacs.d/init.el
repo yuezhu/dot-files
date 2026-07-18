@@ -2618,7 +2618,9 @@ for that same symbol, quit the *Help* window."
 
 (use-package breadcrumb
   :ensure t
-  :hook ((prog-mode text-mode) . breadcrumb-local-mode))
+  :defer 2
+  :config
+  (breadcrumb-mode 1))
 
 
 (use-package abbrev
