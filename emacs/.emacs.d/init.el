@@ -1901,6 +1901,11 @@ This only affects the current markdown buffer, and does not add the
   (reformatter-define terraform-format
     :program "terraform"
     :args '("fmt" "-no-color" "-"))
+  (reformatter-define sh-format
+    :program "shfmt"
+    ;; --filename lets shfmt pick the shell dialect and the matching
+    ;; .editorconfig (indentation) from the buffer's path.
+    :args (list "--filename" (or (buffer-file-name) "stdin.sh")))
 
   :hook
   (((c-mode c++-mode c-ts-mode c++-ts-mode)
@@ -1916,7 +1921,9 @@ This only affects the current markdown buffer, and does not add the
    (jsonnet-mode
     . (lambda () (local-set-key (kbd "<f12>") #'jsonnet-format-buffer)))
    (terraform-mode
-    . (lambda () (local-set-key (kbd "<f12>") #'terraform-format-buffer))))
+    . (lambda () (local-set-key (kbd "<f12>") #'terraform-format-buffer)))
+   ((sh-mode bash-ts-mode)
+    . (lambda () (local-set-key (kbd "<f12>") #'sh-format-buffer))))
 
   :config
   (add-to-list 'display-buffer-alist
