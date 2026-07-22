@@ -56,7 +56,7 @@ OVERLAY=$(cat <<'JSON'
     "padding": 0
   },
   "permissions": {
-    "defaultMode": "plan"
+    "defaultMode": "auto"
   }
 }
 JSON
