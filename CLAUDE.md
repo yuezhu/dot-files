@@ -7,6 +7,7 @@ Personal configuration files managed with GNU Stow.
 Each top-level directory is a stow package targeting `$HOME`. Files within each package mirror the home directory layout (e.g., `zsh/.zshrc` deploys to `~/.zshrc`).
 
 - `claude/` — Claude Code hooks and statusline script
+- `editorconfig/` — global `.editorconfig` (shell indentation defaults)
 - `emacs/` — Emacs config (`early-init.el`, `init.el`)
 - `ghostty/` — Ghostty terminal config
 - `git/` — gitconfig, gitignore_global, gitattributes

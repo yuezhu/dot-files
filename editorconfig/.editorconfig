@@ -1,0 +1,8 @@
+# Deployed to ~/.editorconfig via GNU Stow.
+# Base indentation defaults for files under $HOME; a project's own
+# .editorconfig (closer to the file) overrides these.
+root = true
+
+[*.{sh,bash}]
+indent_style = space
+indent_size = 2
