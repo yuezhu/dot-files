@@ -17,6 +17,17 @@ TARGET="$HOME/.claude/settings.json"
 OVERLAY=$(cat <<'JSON'
 {
   "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh ~/.claude/hooks/reformat.sh"
+          }
+        ]
+      }
+    ],
     "Notification": [
       {
         "matcher": "permission_prompt|auth_success|elicitation_dialog",
