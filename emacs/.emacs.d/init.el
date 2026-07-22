@@ -1923,7 +1923,11 @@ This only affects the current markdown buffer, and does not add the
    (terraform-mode
     . (lambda () (local-set-key (kbd "<f12>") #'terraform-format-buffer)))
    ((sh-mode bash-ts-mode)
-    . (lambda () (local-set-key (kbd "<f12>") #'sh-format-buffer))))
+    . (lambda ()
+        ;; shfmt has no working zsh parser (e.g. `${(@)^arr}`), so leave
+        ;; <f12> unbound in zsh buffers that sh-mode opened.
+        (unless (eq (bound-and-true-p sh-shell) 'zsh)
+          (local-set-key (kbd "<f12>") #'sh-format-buffer)))))
 
   :config
   (add-to-list 'display-buffer-alist
