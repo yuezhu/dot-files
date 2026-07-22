@@ -41,16 +41,24 @@
 ;; `file-name-handler-alist' and runs each regex against the filename
 ;; to check for a match.  These regexes almost never match during
 ;; startup (you're loading local .el files, not remote TRAMP paths or
-;; .gz archives), so it's pure overhead. As a result, we temperatily
+;; .gz archives), so it's pure overhead. As a result, we temporarily
 ;; clear `file-name-handler-alist' during startup and restore it at
 ;; the end.
 (defvar file-name-handler-alist-old file-name-handler-alist)
 
-(setq file-name-handler-alist nil)
-
-(add-hook 'after-init-hook
-          #'(lambda ()
-              (setq file-name-handler-alist file-name-handler-alist-old)))
+;; Only do this during the real startup. `after-init-hook' has already run
+;; when init.el is re-loaded in a live session (M-x eval-buffer/load-file),
+;; so clearing the list again would leave it empty for the rest of the
+;; session -- silently breaking TRAMP, .gz and .gpg file access.
+(unless after-init-time
+  (setq file-name-handler-alist nil)
+  (add-hook 'after-init-hook
+            (lambda ()
+              ;; Merge rather than overwrite: packages loaded during init
+              ;; (e.g. `epa-file', `tramp') register handlers of their own.
+              (setq file-name-handler-alist
+                    (delete-dups (append file-name-handler-alist
+                                         file-name-handler-alist-old))))))
 
 
 ;; Add local lisp files directory to `load-path'.
@@ -201,9 +209,13 @@ restart reminder are echoed to *Messages*."
          (cmd (format "%s --batch --eval %s"
                       (shell-quote-argument emacs)
                       (shell-quote-argument form))))
-    (with-current-buffer (compilation-start cmd nil (lambda (_) "*package-upgrade*"))
-      (add-hook 'compilation-finish-functions
-                #'package-upgrade-all-async--finish nil t))))
+    ;; `compilation-start' runs the command in `default-directory', and does so
+    ;; through the file-name handlers -- from a TRAMP buffer it would run the
+    ;; local Emacs path on the remote host. Pin it to the local config dir.
+    (let ((default-directory user-emacs-directory))
+      (with-current-buffer (compilation-start cmd nil (lambda (_) "*package-upgrade*"))
+        (add-hook 'compilation-finish-functions
+                  #'package-upgrade-all-async--finish nil t)))))
 
 
 ;; (use-package emacs ...) is a common idiom for configuring built-in
@@ -274,7 +286,6 @@ restart reminder are echoed to *Messages*."
 
   ;; src/eval.c
   (max-lisp-eval-depth 2000)
-  (max-specpdl-size 16384)
 
   ;; src/terminal.c
   (ring-bell-function 'ignore)
@@ -361,8 +372,13 @@ restart reminder are echoed to *Messages*."
 (use-package cus-edit
   :defer t
   :init
+  ;; Deliberately a write-only sink, never loaded. Custom is not used to
+  ;; configure anything here, but Emacs still writes to `custom-file' on its
+  ;; own in some cases; pointing it at a separate file keeps those writes out
+  ;; of init.el, and not loading it keeps them from taking effect.
   (setq custom-file (expand-file-name "custom.el"
                                       user-emacs-directory)
+        ;; `q' in a Custom buffer kills it rather than burying it
         custom-buffer-done-kill t))
 
 
@@ -436,8 +452,12 @@ restart reminder are echoed to *Messages*."
   (let ((cache-file (expand-file-name (format "shell-env-%s.el" (system-name))
                                       user-emacs-directory))
         (zsh-files '("~/.zshenv" "~/.zprofile" "~/.zshrc")))
-    (if (not (seq-some (lambda (f) (file-newer-than-file-p f cache-file))
-                       zsh-files))
+    ;; `file-newer-than-file-p' returns nil when its first argument does not
+    ;; exist, so a machine with none of the zsh startup files would report
+    ;; "cache is fresh" even with no cache at all. Test the cache directly.
+    (if (and (file-exists-p cache-file)
+             (not (seq-some (lambda (f) (file-newer-than-file-p f cache-file))
+                            zsh-files)))
         (load cache-file nil :nomessage)
       (exec-path-from-shell-initialize)
       (with-temp-file cache-file
@@ -507,27 +527,32 @@ restart reminder are echoed to *Messages*."
 (unless (display-graphic-p)
   (setq interprogram-paste-function
         (lambda ()
-          (cond
-           ;; Inside tmux: read from the tmux paste buffer.
-           ((getenv "TMUX")
-            (let ((text (with-output-to-string
-                          (with-current-buffer standard-output
-                            (call-process "tmux" nil t nil "save-buffer" "-")))))
-              (unless (string-empty-p text) text)))
-           ;; With an X display: read from the X11 clipboard via xsel.
-           ;; Over SSH without X forwarding $DISPLAY is unset; calling
-           ;; xsel anyway floods the paste with "Can't open display"
-           ;; (stderr from call-process DESTINATION=t mixes into stdout).
-           ((and (getenv "DISPLAY") (executable-find "xsel"))
-            (let ((text (with-output-to-string
-                          (with-current-buffer standard-output
-                            (call-process "xsel" nil t nil "-ob")))))
-              (unless (string-empty-p text) text)))))))
+          ;; Run PROGRAM and return its stdout, or nil if it is unavailable,
+          ;; fails, or prints nothing. A DESTINATION of (t nil) sends stdout
+          ;; to the buffer and discards stderr -- with plain t the two are
+          ;; merged and diagnostics like tmux's "no buffers" or xsel's "Can't
+          ;; open display" would be pasted as if they were clipboard content.
+          (cl-flet ((capture (program &rest args)
+                      (when (executable-find program)
+                        (with-temp-buffer
+                          (when (eq 0 (apply #'call-process
+                                             program nil '(t nil) nil args))
+                            (let ((text (buffer-string)))
+                              (unless (string-empty-p text) text)))))))
+            (cond
+             ;; Inside tmux: read from the tmux paste buffer.
+             ((getenv "TMUX") (capture "tmux" "save-buffer" "-"))
+             ;; With an X display: read from the X11 clipboard via xsel.
+             ;; Over SSH without X forwarding $DISPLAY is unset, so skip it.
+             ((getenv "DISPLAY") (capture "xsel" "-ob")))))))
 
 
 ;; Use a heavier box-drawing character for the vertical window border
 ;; in terminal Emacs, where faces cannot style the border.
 (unless (display-graphic-p)
+  ;; `standard-display-table' starts out nil; disp-table.el creates it when
+  ;; loaded, so require it rather than relying on autoload side effects.
+  (require 'disp-table)
   (set-display-table-slot standard-display-table 'vertical-border ?┃))
 
 
@@ -613,8 +638,11 @@ restart reminder are echoed to *Messages*."
   :custom
   (aw-scope 'frame)
   :custom-face
+  ;; No `:inherit' of this face itself -- a float `:height' is relative and
+  ;; is multiplied along the inheritance chain, so a self-inheriting face
+  ;; resolves to an infinite height instead of 3x.
   (aw-leading-char-face
-   ((t (:inherit aw-leading-char-face :weight bold :height 3.0)))))
+   ((t (:weight bold :height 3.0)))))
 
 
 (use-package zenburn-theme
@@ -875,19 +903,31 @@ restart reminder are echoed to *Messages*."
   )
 
 
-;; Enable rich annotations using the Marginalia package
+;; Rich annotations for completion candidates, off until asked for.
 (use-package marginalia
   :ensure t
   :after vertico
   :defer t
 
-  ;; Bind `marginalia-cycle' locally in the minibuffer.  To make the binding
-  ;; available in the *Completions* buffer, add it to the
-  ;; `completion-list-mode-map'.
-  :bind (:map minibuffer-local-map
-              ("M-A" . marginalia-cycle))
+  :preface
+  (defun marginalia-cycle-dwim ()
+    "Turn on `marginalia-mode' if it is off, otherwise cycle annotators.
+`marginalia-cycle' only rotates which annotator a completion category
+uses; while the mode is off nothing reads that list, so cycling has no
+visible effect.  This makes one key do the useful thing in both states.
 
-  )
+`bound-and-true-p' because `marginalia-mode' is void until the autoload
+for it pulls the package in."
+    (interactive)
+    (if (bound-and-true-p marginalia-mode)
+        (marginalia-cycle)
+      (marginalia-mode 1)
+      (message "Marginalia: enabled")))
+
+  ;; Bound locally in the minibuffer.  To make the binding available in the
+  ;; *Completions* buffer, add it to `completion-list-mode-map'.
+  :bind (:map minibuffer-local-map
+              ("M-A" . marginalia-cycle-dwim)))
 
 
 (use-package embark
@@ -962,7 +1002,7 @@ restart reminder are echoed to *Messages*."
   :bind (:map corfu-map
               ("M-n" . corfu-popupinfo-scroll-up)
               ("M-p" . corfu-popupinfo-scroll-down)
-              ([remap corfu-show-documentation] . corfu-popupinfo-toggle))
+              ([remap corfu-info-documentation] . corfu-popupinfo-toggle))
 
   :custom
   (corfu-popupinfo-delay 0.5)
@@ -1192,7 +1232,10 @@ from under the user."
                       (zerop compilation-num-warnings-found))))
       (run-with-timer compile-auto-bury-delay-seconds nil
                       (lambda (buf)
-                        (unless (eq buf (window-buffer (selected-window)))
+                        ;; Re-check liveness: the buffer can be killed during
+                        ;; the delay, and `bury-buffer' signals on a dead one.
+                        (when (and (buffer-live-p buf)
+                                   (not (eq buf (window-buffer (selected-window)))))
                           (bury-buffer buf)
                           (delete-windows-on buf)))
                       buffer)))
@@ -1230,8 +1273,11 @@ from under the user."
 
   :init
   (add-hook 'comint-output-filter-functions #'comint-truncate-buffer)
-  (add-hook 'comint-output-filter-functions #'comint-output-read-only)
-  (add-hook 'comint-output-filter-functions #'ansi-color-process-output)
+  ;; Appended so it runs last. `ansi-color-process-output' is already on this
+  ;; hook by default and does not bind `inhibit-read-only', so marking the
+  ;; output read-only before it runs makes it signal `text-read-only' and
+  ;; abort the rest of the filter chain (including the password-prompt watch).
+  (add-hook 'comint-output-filter-functions #'comint-output-read-only t)
   (add-hook 'comint-mode-hook #'ansi-color-for-comint-mode-on)
 
   :custom
@@ -1267,11 +1313,18 @@ from under the user."
   :preface
   (defun ps-spool-to-pdf (beg end &rest _ignore)
     (interactive "r")
-    (let ((temp-file (expand-file-name
-                      (concat "~/" (make-temp-name "ps2pdf") ".pdf"))))
-      (call-process-region beg end (executable-find "ps2pdf")
-                           nil nil nil "-" temp-file)
-      (call-process (executable-find "open") nil nil nil temp-file)))
+    ;; `call-process' signals an unhelpful "Invalid argument" when handed the
+    ;; nil that `executable-find' returns for a missing program, so check
+    ;; first. `open' is macOS-only; `xdg-open' is its Linux counterpart.
+    (let ((ps2pdf (executable-find "ps2pdf"))
+          (opener (seq-some #'executable-find '("open" "xdg-open")))
+          (temp-file (make-temp-file "ps2pdf" nil ".pdf")))
+      (unless ps2pdf
+        (user-error "Cannot convert to PDF: ps2pdf not found (install ghostscript)"))
+      (call-process-region beg end ps2pdf nil nil nil "-" temp-file)
+      (if opener
+          (call-process opener nil nil nil temp-file)
+        (message "PDF written to %s" temp-file))))
   :config
   (setq ps-print-region-function 'ps-spool-to-pdf))
 
@@ -1287,11 +1340,12 @@ from under the user."
   :preface
   (defun org-babel-enable-languages (&rest langs)
     "Enable one or more org-babel languages.
-Each element of LANGS should be a cons cell (STRING . SYMBOL),
-e.g. (\"plantuml\" . plantuml).
-Duplicates are skipped based on the language name (car)."
+Each element of LANGS should be a cons cell (SYMBOL . ENABLED),
+matching the shape of `org-babel-load-languages',
+e.g. (plantuml . t).
+Duplicates are skipped based on the language symbol (car)."
     (dolist (lang langs)
-      (unless (assoc (car lang) org-babel-load-languages)
+      (unless (assq (car lang) org-babel-load-languages)
         (add-to-list 'org-babel-load-languages lang)))
     ;; Call `org-babel-do-load-languages' to ensure that the new
     ;; language is registered.
@@ -1347,7 +1401,7 @@ just-captured entry, so this copies that entry's ID for pasting as an
   ;; Include a table of contents in exported documents
   (org-export-with-toc t)
 
-  ;; Do not hide markup characters (e.g. show bold instead of *bold*)
+  ;; Do not hide markup characters (e.g. show *bold*, not just bold)
   (org-hide-emphasis-markers nil)
 
   ;; Hide the first N-1 stars in a headline
@@ -1378,8 +1432,8 @@ just-captured entry, so this copies that entry's ID for pasting as an
   ;; Hide drawers (including :PROPERTIES:) on startup
   (org-hide-drawer-startup t)
 
-  ;; Do not auto-break long lines when typing; keep paragraphs on one
-  ;; line
+  ;; Do not re-align tags to `org-tags-column' after editing a headline.
+  ;; Paired with the setting below, tags simply follow the heading text.
   (org-auto-align-tags nil)
 
   ;; Display tags immediately after the heading text, without column
@@ -1453,6 +1507,10 @@ just-captured entry, so this copies that entry's ID for pasting as an
   ;; Set the path to the PlantUML JAR file for org-babel. This allows
   ;; you to execute PlantUML code blocks in org files and have them
   ;; render diagrams using the specified JAR.
+  ;; Executing a block loads ob-plantuml, not plantuml-mode, so the value has
+  ;; to be set up front; the eval-after-load then keeps the two in sync if
+  ;; plantuml-mode is loaded later and customises the path.
+  (setq org-plantuml-jar-path (expand-file-name "~/plantuml.jar"))
   (with-eval-after-load 'plantuml-mode
     (setq org-plantuml-jar-path plantuml-jar-path))
 
@@ -1526,10 +1584,13 @@ RESULT is the return value of `org-tempo-complete-tag' (t on success, nil on fai
 
 
 ;; `ox-gfm' is an org export backend that exports to GitHub Flavored Markdown.
+;; Demanded (once org is loaded) because an export backend has to be loaded to
+;; register itself; deferred, nothing would ever trigger the load and the
+;; backend would be missing from `org-export-dispatch'.
 (use-package ox-gfm
   :ensure t
   :after org
-  :defer t)
+  :demand t)
 
 
 ;; `org-modern' is a minor mode that provides modern visual enhancements for
@@ -1542,10 +1603,13 @@ RESULT is the return value of `org-tempo-complete-tag' (t on success, nil on fai
 
 ;; `ob-mermaid' is an org-babel language extension that allows you to execute
 ;; Mermaid code blocks in org files and have them render diagrams.
+;; Demanded (once org is loaded) rather than deferred: nothing would ever
+;; trigger the load, so `:config' would never run and mermaid would stay
+;; missing from `org-babel-load-languages'.
 (use-package ob-mermaid
   :ensure t
   :after org
-  :defer t
+  :demand t
   :config
   ;; Enable execution of Mermaid code blocks in org files
   (org-babel-enable-languages '(mermaid . t)))
@@ -1579,19 +1643,13 @@ node file is created or edited outside this Emacs session."
   ;; keeps backlinks accurate in real time at a small cost to save speed.
   (org-roam-db-update-on-save t)
 
-  ;; Allow org headings that have an :ID: property to be treated as first-class
-  ;; roam nodes, not just the file-level #+title node.  This is what makes it
-  ;; possible to link to a specific meeting-log heading (e.g. "** 2026-03-01")
-  ;; rather than just the top of the meeting file.
-  (org-roam-db-node-include-refs t)
-
   ;; Control how each node appears in the completion list shown by
   ;; `org-roam-node-find' and `org-roam-node-insert'.
   (org-roam-node-display-template
    (concat "${hierarchy:*} " (propertize "${tags:40}" 'face 'bold)))
 
   ;; Subdirectory for daily note files, relative to org-roam-directory.
-  ;; Resolves to ~/org/roam/daily/
+  ;; Resolves to ~/org-roam/daily/
   (org-roam-dailies-directory "daily/")
 
   (org-roam-capture-templates
@@ -1697,7 +1755,7 @@ node file is created or edited outside this Emacs session."
      ;;                           → RET → type a description → RET
      ;;   4. C-c C-c              confirm and save
      ("l" "Meeting Link" entry
-      ;; %^{Meeting name} prompts for the meeting name used as the heading title
+      ;; Point lands on the empty heading; type the meeting name there.
       "
 * %?"
       :target (file+head+olp
@@ -1722,10 +1780,15 @@ node file is created or edited outside this Emacs session."
          ("C-c n d y" . org-roam-dailies-goto-yesterday)  ;; open yesterday's daily note
          ("C-c n d c" . org-roam-dailies-capture-today)   ;; capture into today's daily
          ("C-c n d n" . org-roam-dailies-goto-next-note)  ;; navigate to the next day
-         ("C-c n d p" . org-roam-dailies-goto-prev-note)  ;; navigate to the previous day
+         ("C-c n d p" . org-roam-dailies-goto-previous-note)
          )
 
   :config
+  ;; org-roam.el does not pull this in, and only some of the dailies commands
+  ;; are autoloaded -- `org-roam-dailies-goto-next-note' and
+  ;; `-goto-previous-note' are not, so their bindings error without this.
+  (require 'org-roam-dailies)
+
   ;; Ensure the meetings/ subdirectory exists. The Meeting Notes capture
   ;; template expects to find it.
   (make-directory (file-name-concat org-roam-directory "meetings") t)
@@ -1858,7 +1921,10 @@ This only affects the current markdown buffer, and does not add the
   :config
   (put 'hes-escape-backslash-face 'face-alias 'font-lock-builtin-face)
   (put 'hes-escape-sequence-face 'face-alias 'font-lock-builtin-face)
-  (push `(json-mode . ,hes-js-escape-sequence-re) hes-mode-alist))
+  ;; `json-ts-mode' too: it does not run `json-mode-hook', and JSON files are
+  ;; remapped to it (see the treesit block).
+  (push `(json-mode . ,hes-js-escape-sequence-re) hes-mode-alist)
+  (push `(json-ts-mode . ,hes-js-escape-sequence-re) hes-mode-alist))
 
 
 ;; About deferred loading:
@@ -1873,7 +1939,10 @@ This only affects the current markdown buffer, and does not add the
   :init
   (reformatter-define clang-format
     :program "clang-format"
-    :args (list "--assume-filename" (buffer-file-name)))
+    ;; clang-format never reads this path; it uses it only to locate the
+    ;; nearest .clang-format and to infer the language from the extension,
+    ;; so any *.cc name works for buffers not visiting a file.
+    :args (list "--assume-filename" (or (buffer-file-name) "stdin.cc")))
   (reformatter-define google-java-format
     :program "google-java-format"
     :args '("--skip-reflowing-long-strings" "--aosp" "-"))
@@ -1910,27 +1979,49 @@ This only affects the current markdown buffer, and does not add the
     ;; .editorconfig (indentation) from the buffer's path.
     :args (list "--filename" (or (buffer-file-name) "stdin.sh")))
 
-  :hook
-  (((c-mode c++-mode c-ts-mode c++-ts-mode)
-    . (lambda () (local-set-key (kbd "<f12>") #'clang-format-buffer)))
-   ((java-mode java-ts-mode)
-    . (lambda () (local-set-key (kbd "<f12>") #'google-java-format-buffer)))
-   ((json-mode json-ts-mode)
-    . (lambda () (local-set-key (kbd "<f12>") #'json-format-buffer)))
-   (nxml-mode
-    . (lambda () (local-set-key (kbd "<f12>") #'nxml-format-buffer)))
-   ((python-mode python-ts-mode)
-    . (lambda () (local-set-key (kbd "<f12>") #'python-format-buffer)))
-   (jsonnet-mode
-    . (lambda () (local-set-key (kbd "<f12>") #'jsonnet-format-buffer)))
-   (terraform-mode
-    . (lambda () (local-set-key (kbd "<f12>") #'terraform-format-buffer)))
-   ((sh-mode bash-ts-mode)
-    . (lambda ()
-        ;; shfmt has no working zsh parser (e.g. `${(@)^arr}`), so leave
-        ;; <f12> unbound in zsh buffers that sh-mode opened.
-        (unless (eq (bound-and-true-p sh-shell) 'zsh)
-          (local-set-key (kbd "<f12>") #'sh-format-buffer)))))
+  ;; Bind <f12> in each mode's own keymap rather than from a mode hook.
+  ;; `local-set-key' in a hook looks like a buffer-local binding but writes
+  ;; into `current-local-map' -- the major mode's *shared* keymap -- so the
+  ;; binding leaks into every other buffer of that mode.
+  ;;
+  ;; Each tree-sitter mode is listed alongside its classic counterpart: the ts
+  ;; modes do not run the classic mode's hook (see `major-mode-remap-alist' in
+  ;; the treesit block), and they have separate keymaps.
+  (with-eval-after-load 'cc-mode
+    (bind-key "<f12>" #'clang-format-buffer c-mode-base-map)
+    (bind-key "<f12>" #'google-java-format-buffer java-mode-map))
+  (with-eval-after-load 'c-ts-mode
+    (bind-key "<f12>" #'clang-format-buffer c-ts-base-mode-map))
+  (with-eval-after-load 'java-ts-mode
+    (bind-key "<f12>" #'google-java-format-buffer java-ts-mode-map))
+  (with-eval-after-load 'json-mode
+    (bind-key "<f12>" #'json-format-buffer json-mode-map))
+  (with-eval-after-load 'json-ts-mode
+    (bind-key "<f12>" #'json-format-buffer json-ts-mode-map))
+  (with-eval-after-load 'nxml-mode
+    (bind-key "<f12>" #'nxml-format-buffer nxml-mode-map))
+  (with-eval-after-load 'python
+    (bind-key "<f12>" #'python-format-buffer python-mode-map)
+    (bind-key "<f12>" #'python-format-buffer python-ts-mode-map))
+  (with-eval-after-load 'jsonnet-mode
+    (bind-key "<f12>" #'jsonnet-format-buffer jsonnet-mode-map))
+  (with-eval-after-load 'terraform-mode
+    (bind-key "<f12>" #'terraform-format-buffer terraform-mode-map))
+  (defun sh-format-buffer-dwim ()
+    "Format with shfmt, or just indent in zsh buffers.
+shfmt has no working zsh parser (e.g. `${(@)^arr}').  `sh-mode' handles
+every shell dialect through one shared keymap, so the choice has to be
+made at call time from the buffer's own `sh-shell'."
+    (interactive)
+    (call-interactively
+     (if (eq sh-shell 'zsh)
+         #'indent-delete-trailing-whitespace
+       #'sh-format-buffer)))
+
+  (with-eval-after-load 'sh-script
+    (bind-key "<f12>" #'sh-format-buffer-dwim sh-mode-map)
+    ;; `bash-ts-mode' is bash-only, so it can bind shfmt directly.
+    (bind-key "<f12>" #'sh-format-buffer bash-ts-mode-map))
 
   :config
   (add-to-list 'display-buffer-alist
@@ -2136,7 +2227,7 @@ no region is activated, this will operate on the entire buffer."
   (("/\\.htaccess\\'"        . conf-unix-mode)
    ("/\\.tmux\\.conf\\'"     . conf-unix-mode)
    ("/\\.aws/credentials\\'" . conf-unix-mode)
-   ("/\\.properties\\'"      . conf-javaprop-mode)))
+   ("\\.properties\\'"       . conf-javaprop-mode)))
 
 
 (use-package lisp-mode
@@ -2168,7 +2259,9 @@ for that same symbol, quit the *Help* window."
 
 (use-package make-mode
   :defer t
-  :mode ("/Makefile\\..*" . makefile-gmake-mode)
+  ;; Matches Makefile.foo but not paths under a Makefile.d/ directory, which
+  ;; an unanchored pattern would also claim.
+  :mode ("/Makefile\\.[^/]*\\'" . makefile-gmake-mode)
   :hook
   (makefile-mode . (lambda () (setq-local indent-tabs-mode t))))
 
@@ -2328,8 +2421,10 @@ for that same symbol, quit the *Help* window."
 (use-package json-mode
   :ensure t
   :defer t
+  ;; `json-ts-mode' does not run `json-mode-hook', and the treesit block
+  ;; remaps JSON files to it, so both modes have to be listed.
   :hook
-  (json-mode . (lambda () (setq-local tab-width 2))))
+  ((json-mode json-ts-mode) . (lambda () (setq-local tab-width 2))))
 
 
 (use-package jsonnet-mode
@@ -2425,21 +2520,21 @@ for that same symbol, quit the *Help* window."
        (setq-local auto-revert-verbose nil)))
 
   :custom
+  ;; Prefer GNU coreutils ls on macOS (Homebrew installs it as "gls"); it
+  ;; supports --group-directories-first, BSD ls does not. Every branch must
+  ;; yield a program name -- nil would drop dired to the slower `ls-lisp'
+  ;; emulation, which ignores these switches entirely.
   (insert-directory-program
-   (cond
-    ((and (eq system-type 'darwin)
-          (executable-find "gls"))
-     "gls")
-    ((eq system-type 'darwin)
-     "ls")))
+   (if (eq system-type 'darwin)
+       (or (executable-find "gls") "ls")
+     "ls"))
+  ;; --group-directories-first is a GNU coreutils extension: available on
+  ;; Linux, and on macOS only via gls. BSD ls would reject it.
   (dired-listing-switches
-   (cond
-    ((eq system-type 'gnu/linux)
-     "-Ahl --group-directories-first")
-    ((eq system-type 'darwin)
-     (if (string-suffix-p "gls" insert-directory-program)
-         "-Alh --group-directories-first"
-       "-Ahl"))))
+   (if (or (eq system-type 'gnu/linux)
+           (string-suffix-p "gls" insert-directory-program))
+       "-Ahl --group-directories-first"
+     "-Ahl"))
   ;; Kill the current dired buffer when navigating into a subdirectory
   ;; or up to a parent (Emacs 28+).
   (dired-kill-when-opening-new-dired-buffer t)
@@ -2510,7 +2605,10 @@ for that same symbol, quit the *Help* window."
   :preface
   ;; https://github.com/jwiegley/dot-emacs/blob/master/init.el
   (defun recentf-add-dired-directory ()
-    (when (and dired-directory
+    ;; `dired-directory' is a list (DIR FILE...) in buffers built from an
+    ;; explicit file list, e.g. `embark-export'; `file-directory-p' would
+    ;; signal on it and abort the rest of `dired-mode-hook'.
+    (when (and (stringp dired-directory)
                (file-directory-p dired-directory)
                (not (string= "/" dired-directory)))
       (recentf-add-file (directory-file-name dired-directory))))
@@ -2622,8 +2720,11 @@ for that same symbol, quit the *Help* window."
   (global-eldoc-mode t))
 
 
+;; Deferred by idle timer, not `:defer t': nothing else in this config
+;; references `which-func', so the library would never load and
+;; `which-function-mode' would never be enabled.
 (use-package which-func
-  :defer t
+  :defer 2
   :custom
   (which-func-unknown "n/a")
   :config
@@ -2703,7 +2804,9 @@ for that same symbol, quit the *Help* window."
 
 (use-package flymake
   :defer t
-  :hook (sh-mode . flymake-mode))
+  ;; `bash-ts-mode' does not run `sh-mode-hook', and the treesit block remaps
+  ;; shell files to it, so both modes have to be listed.
+  :hook ((sh-mode bash-ts-mode) . flymake-mode))
 
 
 (use-package whitespace
@@ -2716,8 +2819,11 @@ for that same symbol, quit the *Help* window."
              whitespace-mode
              whitespace-newline-mode)
 
+  ;; The tree-sitter modes do not run their classic counterpart's hook, so
+  ;; both names are listed wherever the treesit block remaps a mode.
   :hook ((conf-mode
           json-mode
+          json-ts-mode
           ssh-config-mode
           yaml-mode
           makefile-mode)
