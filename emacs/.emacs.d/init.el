@@ -1891,8 +1891,11 @@ This only affects the current markdown buffer, and does not add the
                 ;; infer the language from the extension (any *.py name works for unsaved buffers)
                 (let ((f (shell-quote-argument
                           (or (buffer-file-name) "stdin.py"))))
+                  ;; reformatter aborts on non-zero exit or stderr output, so
+                  ;; --exit-zero keeps remaining lint warnings from failing the
+                  ;; format, and --quiet drops the fix summary.
                   (format
-                   "ruff check --quiet --select I --fix -e --stdin-filename %s - \
+                   "ruff check --quiet --select I --fix --exit-zero --stdin-filename %s - \
 | ruff format --stdin-filename %s -"
                    f f))))
   (reformatter-define jsonnet-format

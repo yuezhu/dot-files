@@ -73,10 +73,10 @@ js | jsx | ts | tsx | md)
   ;;
 
 py | ipynb)
-  # check --fix applies lint autofixes (e.g. unused-import removal, import
-  # sorting); format then handles layout.
+  # --select I limits the fix to import sorting (no code-removing lint
+  # autofixes); format then handles layout.
   if have ruff; then
-    ruff check --fix "$file_path" >/dev/null 2>&1
+    ruff check --select I --fix "$file_path" >/dev/null 2>&1
     ruff format "$file_path" >/dev/null 2>&1
   fi
   ;;
