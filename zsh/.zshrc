@@ -146,6 +146,10 @@ if exe=$(_find_exec \
   eval "$($exe -b)"
 fi
 
+# Scratch variables from the executable lookups above; drop them so they do not
+# linger in the interactive shell.
+unset brew exe
+
 autoload -Uz compinit
 
 # Speed up zsh compinit by only checking cache once a day
@@ -172,14 +176,17 @@ autoload -Uz compinit
 # https://gist.github.com/ctechols/ca1035271ad134841284#gistcomment-3109177
 ZSH_COMPDUMP=${ZDOTDIR:-$HOME}/.zcompdump
 
+# -d names the dump file explicitly so compinit writes the same path the glob
+# below checks, instead of relying on both defaulting to the same location.
+#
 # `() { }` is a zsh anonymous function, not a subshell. shellcheck does not
 # support zsh and misparses it as bash, triggering SC1072/SC1073.
 # shellcheck disable=SC1072,SC1073
 () {
   if [[ $# -gt 0 ]]; then
-    compinit -u
+    compinit -u -d "$ZSH_COMPDUMP"
   else
-    compinit -C
+    compinit -C -d "$ZSH_COMPDUMP"
   fi
 } ${ZSH_COMPDUMP}(N.mh+24)
 
@@ -207,7 +214,8 @@ _comp_options+=(globdots)
 zmodload -i zsh/complist
 
 # When listing files that are possible completions, show the type of each file
-# with a trailing identifying mark, like the -F option to ls.
+# with a trailing identifying mark, like the -F option to ls. On by default;
+# set explicitly so the intent survives a change of defaults.
 setopt LIST_TYPES
 
 # Lay out the matches in completion lists sorted horizontally, that is, the
@@ -521,6 +529,6 @@ function epoch2date {
 
 ## Custom
 
-if [[ -f ~/.zsh_custom ]]; then
-  . ~/.zsh_custom
-fi
+# Machine-local overrides. `|| true` keeps a missing file from leaving $? at 1
+# for the first prompt of the session.
+_source_file ~/.zsh_custom || true
