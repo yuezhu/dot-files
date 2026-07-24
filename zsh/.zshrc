@@ -255,9 +255,6 @@ zstyle ':completion:*' list-colors ${(s.:.)LS_COLORS}
 # Disable completion for `.' and `..' special directories
 zstyle ':completion:*' special-dirs false
 
-# Allow up to 1 typo for approximate completion
-zstyle ':completion:*' max-errors 1
-
 # Ignore shell functions that should not be used individually
 zstyle ':completion:*:functions' ignored-patterns '_*'
 
