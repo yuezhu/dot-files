@@ -136,8 +136,13 @@ fi
 
 ## Completion
 
-# Export LS_COLORS (used by completion list-colors below)
-if exe=$(_find_exec "${HOMEBREW_PREFIX}/bin/gdircolors" /usr/bin/dircolors); then
+# Export LS_COLORS (used by completion list-colors below).
+# GNU coreutils installs this as `gdircolors` on macOS and `dircolors` on Linux,
+# so both names are searched across the providers before the system copy.
+if exe=$(_find_exec \
+           "${(@)^zsh_providers}/bin/gdircolors" \
+           "${(@)^zsh_providers}/bin/dircolors" \
+           /usr/bin/dircolors); then
   eval "$($exe -b)"
 fi
 
@@ -437,7 +442,9 @@ case $OSTYPE in
         export CLICOLOR=1
         export LSCOLORS='ExGxbxdxCxegedabagacad' ;;
     esac
-    alias htop="sudo ${HOMEBREW_PREFIX}/bin/htop" ;;
+    # sudo resets PATH, so the alias needs an absolute path. Guard on the
+    # binary existing, otherwise an empty HOMEBREW_PREFIX yields `sudo /bin/htop`.
+    [[ -x ${HOMEBREW_PREFIX}/bin/htop ]] && alias htop="sudo ${HOMEBREW_PREFIX}/bin/htop" ;;
 esac
 
 alias l='ls -CF'
