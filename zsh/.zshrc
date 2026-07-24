@@ -189,8 +189,14 @@ setopt ALWAYS_TO_END
 # started. Otherwise it stays there and completion is done from both ends.
 setopt COMPLETE_IN_WORD
 
-# Do not require a leading '.' in a filename to be matched explicitly.
-setopt GLOB_DOTS
+# Do not require a leading '.' in a filename to be matched explicitly, so
+# hidden files show up as completions.
+#
+# This goes through _comp_options rather than `setopt GLOB_DOTS` because
+# compinit applies _comp_options with `setopt localoptions` on every entry into
+# the completion system. A global GLOB_DOTS would also make ordinary globs match
+# dotfiles, so `rm *` would delete them.
+_comp_options+=(globdots)
 
 # complist provides the menuselect keymap and colored completion listings.
 zmodload -i zsh/complist
