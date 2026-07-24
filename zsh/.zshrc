@@ -192,51 +192,42 @@ setopt COMPLETE_IN_WORD
 # Do not require a leading '.' in a filename to be matched explicitly.
 setopt GLOB_DOTS
 
-if _source_file "${(@)^zsh_providers}/share/fzf-tab/fzf-tab.zsh"; then
+# complist provides the menuselect keymap and colored completion listings.
+zmodload -i zsh/complist
 
-  # force zsh not to show completion menu, which allows fzf-tab to capture the unambiguous prefix
-  zstyle ':completion:*' menu no
+# When listing files that are possible completions, show the type of each file
+# with a trailing identifying mark, like the -F option to ls.
+setopt LIST_TYPES
 
-else
-  # Native zsh completion UI — only reached when fzf-tab is absent (e.g. a
-  # fresh box or minimal env before nix/brew provisioning).
-  # complist provides the menuselect keymap and colored completion listings.
-  zmodload -i zsh/complist
+# Lay out the matches in completion lists sorted horizontally, that is, the
+# second match is to the right of the first one, not under it as usual.
+setopt LIST_ROWS_FIRST
 
-  # When listing files that are possible completions, show the type of each file
-  # with a trailing identifying mark, like the -F option to ls.
-  setopt LIST_TYPES
+# On an ambiguous completion, instead of listing possibilities or beeping,
+# insert the first match immediately.
+# This causes the current candidate to be selected and inserted immediately
+# without having to press TAB.
+setopt MENU_COMPLETE
 
-  # Lay out the matches in completion lists sorted horizontally, that is, the
-  # second match is to the right of the first one, not under it as usual.
-  setopt LIST_ROWS_FIRST
+# Try to make the completion list smaller (occupying less lines) by printing
+# the matches in columns with different widths.
+setopt LIST_PACKED
 
-  # On an ambiguous completion, instead of listing possibilities or beeping,
-  # insert the first match immediately.
-  # This causes the current candidate to be selected and inserted immediately
-  # without having to press TAB.
-  setopt MENU_COMPLETE
+# Incremental completion searching
+bindkey -M menuselect '^s' history-incremental-search-forward
 
-  # Try to make the completion list smaller (occupying less lines) by printing
-  # the matches in columns with different widths.
-  setopt LIST_PACKED
+# Enable menu selection
+# Display a list of candidates for an ambiguous completion when hitting TAB
+zstyle ':completion:*' menu select
 
-  # Incremental completion searching
-  bindkey -M menuselect '^s' history-incremental-search-forward
+# Highlight the first ambiguous character in completion lists
+zstyle ':completion:*' show-ambiguity true
 
-  # Enable menu selection
-  # Display a list of candidates for an ambiguous completion when hitting TAB
-  zstyle ':completion:*' menu select
+# Enable scrolling through a completion list
+zstyle ':completion:*:default' list-prompt ''
 
-  # Highlight the first ambiguous character in completion lists
-  zstyle ':completion:*' show-ambiguity true
-
-  # Enable scrolling through a completion list
-  zstyle ':completion:*:default' list-prompt ''
-
-  # Colorize kill completion menu (pid=red, user=cyan, etime=yellow, command=default)
-  zstyle ':completion:*:*:*:*:processes' list-colors '=(#b) #([0-9]##) ([0-9a-z_-]##) #([^ ]##) *=0=31=36=33'
-fi
+# Colorize kill completion menu (pid=red, user=cyan, etime=yellow, command=default)
+zstyle ':completion:*:*:*:*:processes' list-colors '=(#b) #([0-9]##) ([0-9a-z_-]##) #([^ ]##) *=0=31=36=33'
 
 # Display lists of matches for files in different colours depending on the file
 # type
