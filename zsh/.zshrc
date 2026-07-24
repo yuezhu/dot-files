@@ -417,7 +417,9 @@ elif _source_file "${(@)^zsh_providers}/share/zsh-syntax-highlighting/zsh-syntax
   # Fall back to zsh-syntax-highlighting. It self-locates its highlighters dir
   # from its own script path; set ZSH_HIGHLIGHT_HIGHLIGHTERS_DIR manually only
   # if an install ever breaks that resolution.
-  export ZSH_HIGHLIGHT_STYLES[comment]='fg=245'
+  # Plain assignment, not `export`: zsh cannot export a single element of an
+  # associative array, so `export` here would be a silent no-op at best.
+  ZSH_HIGHLIGHT_STYLES[comment]='fg=245'
 fi
 
 ## Pager
