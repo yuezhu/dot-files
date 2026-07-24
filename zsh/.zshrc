@@ -285,6 +285,12 @@ setopt EXTENDED_HISTORY
 
 # Exclude some commands from history.
 zshaddhistory() {
+  # The patterns below use '#' as the "zero or more repetitions" operator, which
+  # only has that meaning when the EXTENDED_GLOB option is set — otherwise it is
+  # a literal '#' and every match here silently fails. `localoptions` scopes the
+  # option to this function so it does not leak into the interactive shell.
+  setopt localoptions extendedglob
+
   # Strip trailing newline that zsh always appends to $1
   local cmd="${1%%$'\n'}"
 
