@@ -463,9 +463,6 @@ alias grep='grep --color=auto'
 alias fgrep='grep -F --color=auto'
 alias egrep='grep -E --color=auto'
 
-alias rm='rm -i'
-alias cp='cp -i'
-alias mv='mv -i'
 alias history='history -i 0'
 
 # Convert an epoch value to a local-time ISO-8601 date string.
