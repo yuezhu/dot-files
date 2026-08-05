@@ -1548,30 +1548,50 @@ just-captured entry, so this copies that entry's ID for pasting as an
   :after org
   :defer t
   :preface
-  (defun org-tempo-post-expand (result)
-    "Clean up trailing > from electric-pair and trigger completion after `org-tempo' expansion.
-RESULT is the return value of `org-tempo-complete-tag' (t on success, nil on failure)."
-    ;; This is a `:filter-return' advice, so its return value replaces
-    ;; `org-tempo-complete-tag's.  That function is on
-    ;; `org-tab-before-tab-emulation-hook', which `org-cycle' (org-mode's TAB
-    ;; command) runs via `run-hook-with-args-until-success' — a macro that stops
-    ;; at the first non-nil return, short-circuiting further TAB processing.
-    ;;
-    ;; On success (result = t): remove the trailing >, invoke
-    ;; `completion-at-point' to trigger the corfu menu, and return t to
-    ;; short-circuit the hook.
-    ;; On failure (result = nil): return nil so TAB falls through normally.
-    (when result
-      (save-excursion
-        (let ((bound (save-excursion (forward-line 3) (point))))
-          (when (re-search-forward "^#\\+end_[a-z]+" bound t)
-            (when (eq (char-after) ?>)
-              (delete-char 1)))))
-      (completion-at-point))
-    result)
+  (defun org-tempo-expand (expand &rest args)
+    "Expand an `org-tempo' tag, then offer completion for what it inserted.
+EXPAND is `org-tempo-complete-tag' and ARGS its arguments.  Returns t when
+a tag was expanded, nil otherwise.
+
+Org's syntax table gives < and > open/close-paren syntax (they delimit
+timestamps such as <2026-08-05>), so `electric-pair-mode' turns a typed
+`<s' into `<s>' with point before the >.  The tag still expands, but the
+leftover > lands right after the inserted #+end_src.  Org only closes a
+block on a line that is exactly #+end_src, so #+end_src> does not close
+it: the new block instead runs to the end of the *next* block, and the
+`indent-according-to-mode' step of the template then round-trips all of
+that through an edit buffer, which comma-escapes every #+begin_/#+end_
+line it swallowed.  So drop the > before expanding, and put it back if
+nothing was expanded after all.
+
+This is an `:around' advice, so its return value replaces
+`org-tempo-complete-tag's.  That function is on
+`org-tab-before-tab-emulation-hook', which `org-cycle' (org-mode's TAB
+command) runs via `run-hook-with-args-until-success' — a macro that stops
+at the first non-nil return, short-circuiting further TAB processing.
+Returning t therefore claims the TAB; nil lets it fall through normally."
+    (let* ((paired (and (eq (char-after) ?>)
+                        (save-excursion
+                          (skip-chars-backward "[:word:]")
+                          (and (eq (char-before) ?<)
+                               (progn (backward-char)
+                                      (skip-chars-backward " \t")
+                                      (bolp))))))
+           (expanded (progn
+                       (when paired (delete-char 1))
+                       (apply expand args))))
+      (cond (expanded
+             ;; Trigger the corfu menu on the freshly inserted block, so the
+             ;; language of a #+begin_src can be picked from a list.
+             (completion-at-point))
+            (paired
+             ;; Restore electric-pair's >, point back in between.
+             (insert ">")
+             (backward-char)))
+      expanded))
 
   :config
-  (advice-add 'org-tempo-complete-tag :filter-return #'org-tempo-post-expand))
+  (advice-add 'org-tempo-complete-tag :around #'org-tempo-expand))
 
 
 ;; `org-make-toc-mode' is a minor mode that automatically generates a table of
