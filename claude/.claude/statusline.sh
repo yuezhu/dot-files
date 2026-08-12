@@ -22,7 +22,7 @@ INPUT=$(cat)
 eval "$(echo "$INPUT" | jq -r '
   "MODEL=" + (.model.display_name | @sh),
   "VERSION=" + (.version // "" | @sh),
-  "DIR=" + (.workspace.current_dir | @sh),
+  "DIR=" + (.workspace.current_dir // "." | @sh),
   "COST=" + (.cost.total_cost_usd // 0 | tostring),
   "PCT=" + ((.context_window.used_percentage // 0) | ceil | tostring),
   "DURATION_MS=" + (.cost.total_duration_ms // 0 | tostring)
@@ -44,8 +44,10 @@ RESET="${ESC}[0m"
 #     green (< 70%)  ·  yellow (70–89%)  ·  red (≥ 90%)
 pct_bar() {
   _pct=$1
-  if [ "$_pct" -ge 90 ]; then _color="$RED"
-  elif [ "$_pct" -ge 70 ]; then _color="$YELLOW"
+  if [ "$_pct" -ge 90 ]; then
+    _color="$RED"
+  elif [ "$_pct" -ge 70 ]; then
+    _color="$YELLOW"
   else _color="$GREEN"; fi
 
   _filled=$((_pct / 10))
@@ -53,11 +55,11 @@ pct_bar() {
   _bar=""
   while [ $_i -lt $_filled ]; do
     _bar="${_bar}█"
-    _i=$((_i+1))
+    _i=$((_i + 1))
   done
   while [ $_i -lt 10 ]; do
     _bar="${_bar}░"
-    _i=$((_i+1))
+    _i=$((_i + 1))
   done
 
   printf '%s' "${_color}${_bar}${RESET} ${_pct}%"
@@ -82,9 +84,40 @@ human_duration() {
   fi
 }
 
+# git_ref <dir>
+#   Print the checked-out branch of the repo containing <dir>, or the short
+#   commit hash when HEAD is detached with no branch to inherit. Prints
+#   nothing outside a repo.
+git_ref() {
+  _dir=$1
+  _hops=0
+
+  # A submodule is normally checked out detached at the commit its parent
+  # pins, so it has no branch of its own — the branch being worked on lives
+  # in the superproject. Walk up until one reports a branch; the loop repeats
+  # for submodules nested inside submodules, and the cap stops a malformed
+  # setup from spinning.
+  while [ -n "$_dir" ] && [ "$_hops" -lt 8 ]; do
+    # symbolic-ref reports the branch even in a repo with no commits yet,
+    # where `git branch --show-current` and rev-parse both come up empty.
+    git -C "$_dir" symbolic-ref --quiet --short HEAD 2>/dev/null && return 0
+
+    _dir=$(git -C "$_dir" rev-parse --show-superproject-working-tree 2>/dev/null)
+    _hops=$((_hops + 1))
+  done
+
+  # Genuinely detached: mid-rebase or bisect, or a tag or commit checked out.
+  _sha=$(git -C "$1" rev-parse --short HEAD 2>/dev/null) || return 0
+  printf '%s' "@$_sha"
+}
+
 # --- Render -------------------------------------------------------------------
 
-BRANCH=$(git branch --show-current 2>/dev/null)
+# Resolve the branch against the reported directory rather than this script's
+# own working directory: Claude Code spawns the statusline command from the
+# session cwd, which falls back to the project root if that directory has
+# gone away, and can differ from the directory shown below.
+BRANCH=$(git_ref "$DIR")
 [ -n "$BRANCH" ] && BRANCH=" | 🌿 $BRANCH"
 
 COST_FMT=$(printf '$%.2f' "$COST")
