@@ -13,7 +13,7 @@ font-feature = -calt
 # Apple's bundled monospace font
 font-family = Menlo
 # Text size in points
-font-size = 15
+font-size = 17
 
 ## Cursor
 # Cursor shape: block, bar, or underline
