@@ -76,11 +76,11 @@ zsh_providers=("${HOME}/.nix-profile")
 [[ -n $HOMEBREW_PREFIX ]] && zsh_providers+=("${HOMEBREW_PREFIX}")
 
 # Homebrew binaries
-_prepend_path \
-  "${HOMEBREW_PREFIX}/opt/gawk/libexec/gnubin" \
-  "${HOMEBREW_PREFIX}/opt/gnu-sed/libexec/gnubin" \
-  "${HOMEBREW_PREFIX}/opt/findutils/libexec/gnubin" \
-  "${HOMEBREW_PREFIX}/opt/curl/bin"
+# _prepend_path \
+#   "${HOMEBREW_PREFIX}/opt/gawk/libexec/gnubin" \
+#   "${HOMEBREW_PREFIX}/opt/gnu-sed/libexec/gnubin" \
+#   "${HOMEBREW_PREFIX}/opt/findutils/libexec/gnubin" \
+#   "${HOMEBREW_PREFIX}/opt/curl/bin"
 
 # Per-user binaries
 _prepend_path \
