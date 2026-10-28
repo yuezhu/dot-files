@@ -6,11 +6,11 @@
 # and prints two ANSI-colored lines suitable for embedding in a terminal
 # statusline (e.g. tmux status-right).
 #
-#   Line 1: model · version · project dir · git branch
+#   Line 1: model · version · project dir (git branch) [› cwd]
 #   Line 2: context-window usage bar · session cost · elapsed time
 #
 # Example:
-#   Opus 4.6 (v1.0.20) | 📁 my-project | 🌿 main
+#   Opus 4.6 (v1.0.20) | 📁 ~/my-project (main) › src/lib
 #   ███░░░░░░░ 30% | 💰 $1.23 | ⏱️ 4m 12s
 
 # --- Parse status JSON --------------------------------------------------------
@@ -22,10 +22,11 @@ INPUT=$(cat)
 eval "$(echo "$INPUT" | jq -r '
   "MODEL=" + (.model.display_name | @sh),
   "VERSION=" + (.version // "" | @sh),
-  "DIR=" + (.workspace.current_dir // "." | @sh),
+  "DIR=" + (.workspace.current_dir // .cwd // .workspace.project_dir // "." | @sh),
+  "PROJECT=" + (.workspace.project_dir // "" | @sh),
   "COST=" + (.cost.total_cost_usd // 0 | tostring),
   "PCT=" + ((.context_window.used_percentage // 0) | ceil | tostring),
-  "DURATION_MS=" + (.cost.total_duration_ms // 0 | tostring)
+  "DURATION_MS=" + (.cost.total_duration_ms // 0 | floor | tostring)
 ')"
 
 # --- ANSI colors --------------------------------------------------------------
@@ -44,6 +45,7 @@ RESET="${ESC}[0m"
 #     green (< 70%)  ·  yellow (70–89%)  ·  red (≥ 90%)
 pct_bar() {
   _pct=$1
+  [ "$_pct" -gt 100 ] && _pct=100
   if [ "$_pct" -ge 90 ]; then
     _color="$RED"
   elif [ "$_pct" -ge 70 ]; then
@@ -111,18 +113,62 @@ git_ref() {
   printf '%s' "@$_sha"
 }
 
+# pretty_path <path>
+#   Abbreviate $HOME to ~ and drop control characters, so a hostile directory
+#   name can't inject terminal escapes or break the line.
+pretty_path() {
+  case "$1" in
+  "$HOME" | "$HOME"/*) _p="~${1#"$HOME"}" ;;
+  *) _p=$1 ;;
+  esac
+  printf '%s' "$_p" | tr -d '\000-\037\177'
+}
+
+# location <project> <cwd>
+#   Print the location segment: the Claude project (the directory the session
+#   was launched in) with its branch, then the cwd only when it has moved
+#   away, relative inside the project and absolute outside it. The cwd gets
+#   its own branch only when that differs, e.g. a separate repo outside the
+#   project. An empty <project> falls back to <cwd>.
+#
+#     ~/dot-files (master)
+#     ~/dot-files (master) › claude/.claude
+#     ~/dot-files (master) › ~/other (main)
+#
+#   Branches are resolved against the given directories rather than this
+#   script's own working directory: Claude Code spawns the statusline command
+#   from the session cwd, which falls back to the project root if that
+#   directory has gone away.
+location() {
+  _project=${1:-$2}
+  _cwd=$2
+
+  _project_branch=$(git_ref "$_project")
+  _loc=$(pretty_path "$_project")
+  [ -n "$_project_branch" ] && _loc="$_loc ($_project_branch)"
+
+  if [ "$_cwd" != "$_project" ]; then
+    case "$_cwd" in
+    "$_project"/*) _loc="$_loc › $(pretty_path "${_cwd#"$_project"/}")" ;;
+    *) _loc="$_loc › $(pretty_path "$_cwd")" ;;
+    esac
+    _cwd_branch=$(git_ref "$_cwd")
+    if [ -n "$_cwd_branch" ] && [ "$_cwd_branch" != "$_project_branch" ]; then
+      _loc="$_loc ($_cwd_branch)"
+    fi
+  fi
+
+  printf '%s' "$_loc"
+}
+
 # --- Render -------------------------------------------------------------------
 
-# Resolve the branch against the reported directory rather than this script's
-# own working directory: Claude Code spawns the statusline command from the
-# session cwd, which falls back to the project root if that directory has
-# gone away, and can differ from the directory shown below.
-BRANCH=$(git_ref "$DIR")
-[ -n "$BRANCH" ] && BRANCH=" | 🌿 $BRANCH"
+# jq always emits a dot decimal; pin the locale so printf parses it.
+COST_FMT=$(LC_NUMERIC=C printf '$%.2f' "$COST")
 
-COST_FMT=$(printf '$%.2f' "$COST")
+LOCATION=$(location "$PROJECT" "$DIR")
 
 # Line 1: identity & location
-printf '%s\n' "${CYAN}${MODEL}${RESET} (v${VERSION}) | 📁 ${DIR##*/}$BRANCH"
+printf '%s\n' "${CYAN}${MODEL}${RESET} (v${VERSION}) | 📁 ${LOCATION}"
 # Line 2: resource gauges
 printf '%s\n' "$(pct_bar "$PCT") | 💰 ${YELLOW}${COST_FMT}${RESET} | ⏱️ $(human_duration "$DURATION_MS")"
